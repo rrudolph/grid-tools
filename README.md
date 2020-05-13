@@ -11,4 +11,5 @@ If you run as a toolbox, make sure to change line 8 to False like so:
 run_stand_alone = False
 ```
 
+Running this script **requires** having a geodatabase set up with the correct featureclasses and fields.
 
