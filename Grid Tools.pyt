@@ -1,3 +1,12 @@
+'''
+Arcpy python toolbox (and standalone script) for use in automating
+Wildlands Conservation Science invasives species data collection system.
+
+Author: Rocky Rudolph, GISP, rocky_rudolph@nps.gov
+Date 5/20/2020
+'''
+
+
 import arcpy, os, re, itertools
 try:
     from colorama import Fore, Back, Style, init
@@ -5,7 +14,9 @@ try:
 except:
     pass
 
-run_stand_alone = True
+# TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
+
+run_stand_alone = False
 
 class Toolbox(object):
     def __init__(self):
@@ -266,7 +277,7 @@ def get_geom(fc, inputID):
     return geom
 
 def generate_output_grid(out_fc, geom, join_fc, sr, species):
-    print_("Generating grid for " + get_base_name(out_fc), "yellow")
+    print_("Generating grid for " + out_fc, "yellow")
     print_("Creating output feature class")
     arcpy.CreateFeatureclass_management(os.path.dirname(out_fc),
         os.path.basename(out_fc), 
@@ -304,7 +315,7 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
 
     print_("Adding field name")
     fieldName = get_base_name(join_fc)
-    add_field(out_join, "FeatureType", 50)
+    add_field(out_join, "Action_Type", 50)
     print_("Calculating field")
     arcpy.CalculateField_management(out_join, "FeatureType", "'{}'".format(fieldName), "PYTHON_9.3", "")
 
