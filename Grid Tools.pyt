@@ -246,7 +246,7 @@ def add_field(fc, field, fieldLength):
 def calc_error_field(fc, msg, val):
     # Calculates the sub id based on the input val (or key, 
     # or ID, whatever you want to call it)
-    add_field(fc, "OverlapIssue", 25)
+    add_field(fc, "Overlap_Issue", 25)
     with arcpy.da.UpdateCursor(fc, ["OID@", "OverlapIssue"]) as cursor:
 
         for row in cursor:
