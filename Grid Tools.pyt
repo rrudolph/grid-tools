@@ -115,6 +115,7 @@ def run(data_ws, scratch_ws):
 
     spatialref = arcpy.Describe(inGrid).spatialReference
 
+    check_scratch_db()
 
     for list_ in fc_list:
         fc = list_[0]
@@ -389,6 +390,17 @@ def cut(lines, polygons):
 
     return slices, no_cross
 
+
+def check_scratch_db():
+    fcs = arcpy.ListFeatureClasses()
+    if len(fcs) > 0:
+        sys.exit('''
+WARNING!
+Your scratch geodatabase is not empty. It is advised to have an empty scratch workspace before proceeding.
+Please delete files from it and try again.
+''')
+    else:
+        print_("Scratch workspace empty, continuing...", "green")
 
 
 def stand_alone():
