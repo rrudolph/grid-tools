@@ -16,7 +16,7 @@ except:
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
-run_stand_alone = False
+run_stand_alone = True
 
 class Toolbox(object):
     def __init__(self):
@@ -81,6 +81,11 @@ class CutAndMergeCells(object):
         return
 
 def run(data_ws, scratch_ws):
+    '''
+    Run the main program that accepts workspaces.
+    data_ws: the workspace where all the data exists.
+    scratch_ws: an empty scratch workspace to put output data.
+    '''
 
     arcpy.env.workspace = scratch_ws
     arcpy.env.overwriteOutput = True
@@ -89,7 +94,7 @@ def run(data_ws, scratch_ws):
     inGrid = os.path.join(data_ws, "NCI_Grids", "NCI_Grid_25m")
     cutter = os.path.join(data_ws, "TreatmentFiles", "Cut_Line" )
     final_fc = "Merge_Test"
-    input_id = "PageName"
+    input_id = "IDPK"
 
     weed_field_list = ["weed_Target"]
     other_field_list = ["Species1", "Species2","Species3","Species4","Species5",]
@@ -168,9 +173,13 @@ def run(data_ws, scratch_ws):
                 print_(msg, "yellow")
                 calc_error_field(final_fc, msg, e2[0])
 
+    print_("Deleting extra species fields", "red")
+    delete_fields(final_fc, other_field_list)
+
     print_("Done!", "green")
 
 def print_(text, color="black"):
+    # Make fancy colored output if using the terminal. 
 
     if main_script:
         if color == "red":
@@ -208,9 +217,8 @@ def print_(text, color="black"):
     else:
         arcpy.AddMessage(text)
 
-
-
 def get_base_name(fc):
+    # Return the basename of an fc rather than the entire path.
     baseName = arcpy.Describe(fc).baseName
     return baseName
 
@@ -220,6 +228,7 @@ def get_unique_values(fc, field):
         return {row[0] for row in cursor}
 
 def make_mem_name(fc):
+    # Make an in-memory temporary featureclass
     name = arcpy.Describe(fc).name
     return r"in_memory\{}".format(name)
 
@@ -243,11 +252,23 @@ def add_field(fc, field, fieldLength):
         arcpy.AddField_management(fc, field, "TEXT", fieldLength)
         print_("Successfully added field: " + field)
 
+def delete_fields(fc, fieldList):
+    '''
+    Delete fields. Accepts a featureclass and a list of field names. 
+    '''
+    for field in fieldList:
+        try:
+            print_("Deleting field " + field, "yellow")
+            arcpy.DeleteField_management(in_table=fc, drop_field=field)
+        except:
+            print_("Error deleting field " + field, "red")
+
 def calc_error_field(fc, msg, val):
     # Calculates the sub id based on the input val (or key, 
     # or ID, whatever you want to call it)
-    add_field(fc, "Overlap_Issue", 25)
-    with arcpy.da.UpdateCursor(fc, ["OID@", "OverlapIssue"]) as cursor:
+    error_field_name = "Overlap_Issue"
+    add_field(fc, error_field_name, 25)
+    with arcpy.da.UpdateCursor(fc, ["OID@", error_field_name]) as cursor:
 
         for row in cursor:
             if row[0] == val:
@@ -277,6 +298,10 @@ def get_geom(fc, inputID):
     return geom
 
 def generate_output_grid(out_fc, geom, join_fc, sr, species):
+    '''
+    Creates a new featureclass based on cut or uncut geometry from the cut function.
+    Does a spatial join from the source point or line feature. Adds needed fields.
+    '''
     print_("Generating grid for " + out_fc, "yellow")
     print_("Creating output feature class")
     arcpy.CreateFeatureclass_management(os.path.dirname(out_fc),
@@ -313,20 +338,30 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
         search_radius="", 
         distance_field_name="")
 
-    print_("Adding field name")
+    # Add the name of the feature to the attribute table. This will allow the user to see the source of 
+    # the feature and its type.
+    action_field = "Action_Type"
+    print_("Adding and calculating field name: " + action_field)
     fieldName = get_base_name(join_fc)
-    add_field(out_join, "Action_Type", 50)
+    add_field(out_join, action_field, 50)
     print_("Calculating field")
-    arcpy.CalculateField_management(out_join, "FeatureType", "'{}'".format(fieldName), "PYTHON_9.3", "")
+    arcpy.CalculateField_management(out_join, action_field, "'{}'".format(fieldName), "PYTHON_9.3", "")
 
-    if not check_field(out_join, "weed_Target"):
-        add_field(out_join, "weed_Target", 100)
+    # Add weed target field if it doesn't exist. This is for the non-weed treatment features.
+    weed_target = "weed_Target"
+    if not check_field(out_join, weed_target):
+        print("Adding weed {} field".format(weed_target))
+        add_field(out_join, weed_target, 100)
         print_("Calculating field")
-        arcpy.CalculateField_management(out_join, "weed_Target", "'{}'".format(species), "PYTHON_9.3", "")
+        arcpy.CalculateField_management(out_join, weed_target, "'{}'".format(species), "PYTHON_9.3", "")
 
 
 
 def cut(lines, polygons):
+    '''
+    Cut a cell by a line. Put into two lists of geometry, cells that got cut,
+    and cells that did not get cut.  Return both lists.
+    '''
     print_("Cutting", "cyan")
     slices = []
     no_cross = []
