@@ -16,7 +16,7 @@ except:
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
-run_stand_alone = False
+run_stand_alone = True
 
 class Toolbox(object):
     def __init__(self):
@@ -173,8 +173,9 @@ def run(data_ws, scratch_ws):
                 print_(msg, "yellow")
                 calc_error_field(final_fc, msg, e2[0])
 
-    print_("Deleting extra species fields", "red")
-    delete_fields(final_fc, other_field_list)
+    print_("Deleting unneeded fields", "red")
+    del_fields = other_field_list + ["Join_Count", "TARGET_FID"]
+    delete_fields(final_fc, del_fields)
 
     print_("Done!", "green")
 
@@ -240,7 +241,7 @@ def check_field(fc, field):
     else:
         return False
 
-def add_field(fc, field, fieldLength):
+def add_field(fc, field, fieldLength, alias = None):
     # Adds a field if it doesn't exists
     fieldNames = [f.name for f in arcpy.ListFields(fc)]
     if field in fieldNames:
@@ -249,7 +250,7 @@ def add_field(fc, field, fieldLength):
         print_("Field exists.")
         pass
     else:
-        arcpy.AddField_management(fc, field, "TEXT", fieldLength)
+        arcpy.AddField_management(fc, field, "TEXT", fieldLength, field_alias = alias)
         print_("Successfully added field: " + field)
 
 def delete_fields(fc, fieldList):
@@ -343,7 +344,7 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
     action_field = "Action_Type"
     print_("Adding and calculating field name: " + action_field)
     fieldName = get_base_name(join_fc)
-    add_field(out_join, action_field, 50)
+    add_field(out_join, action_field, 50, "Action Type")
     print_("Calculating field")
     arcpy.CalculateField_management(out_join, action_field, "'{}'".format(fieldName), "PYTHON_9.3", "")
 

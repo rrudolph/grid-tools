@@ -27,13 +27,14 @@ def field_order_lookup(fc):
     return switcher.get(fc, "Error") 
 
 
-def make_dict(fclist):
+def make_lookup_dict(fclist):
     for fc in fclist:
         fieldNames = [f.name for f in arcpy.ListFields(fc)]
         print(f'"{fc}": {fieldNames},')
 
 def reorder_fields(table, out_table, field_order, add_missing=True):
     """ 
+    this function courtesy of https://gis.stackexchange.com/questions/32119/reordering-fields-permanently-in-file-geodatabase-using-arcgis-desktop
     Reorders fields in input featureclass/table
     :table:         input table (fc, table, layer, etc)
     :out_table:     output table (fc, table, layer, etc)
@@ -78,7 +79,7 @@ def reorder_fields(table, out_table, field_order, add_missing=True):
 
 fcs = arcpy.ListFeatureClasses()
 
-# make_dict(fcs)
+# make_lookup_dict(fcs)
 
 for fc in fcs:
     out_fc = fc + "_reorder"
