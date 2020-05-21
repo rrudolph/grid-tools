@@ -16,7 +16,7 @@ except:
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
-run_stand_alone = True
+run_stand_alone = False
 
 class Toolbox(object):
     def __init__(self):
