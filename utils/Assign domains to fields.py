@@ -26,42 +26,38 @@ ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_2020042
 # RubyLakeNWR_Species_List
 # ID_CONFIDE
 
-
-
-
-
 def field_lookup(fc):
     '''
     Returns the reordered field list by fc name
     '''
     switcher = {
-    "Assigned": "Staff",
-	"Assigned_By": "Staff",
+    "Assigned": "DOM_DataRecorder",
+	"Assigned_By": "DOM_DataRecorder",
 	"DyneAmic": "SurfactantRate",
-	"Entered_By": "Staff",
+	"Entered_By": "DOM_DataRecorder",
 	"Grounded": "SurfactantRate",
 	"Limitations": "Limitations",
-	"Observer": "Staff",
+	"Observer": "DOM_DataRecorder",
 	"Photo_Taken": "YesNo",
-	"Species": "SCI_WeedList",
-	"Species1": "SCI_WeedList",
-	"Species2": "SCI_WeedList",
-	"Species3": "SCI_WeedList",
-	"Species4": "SCI_WeedList",
-	"Species5": "SCI_WeedList",
-	"Staff": "Staff",
-	"applicator": "Staff",
-	"asso_Species_1": "NCI_Species",
-	"asso_Species_2": "NCI_Species",
-	"asso_Species_3": "NCI_Species",
-	"asso_Species_4": "NCI_Species",
-	"asso_Species_5": "NCI_Species",
+	"Species": "DOM_InvasiveSpecies",
+	"Species1": "DOM_InvasiveSpecies",
+	"Species2": "DOM_InvasiveSpecies",
+	"Species3": "DOM_InvasiveSpecies",
+	"Species4": "DOM_InvasiveSpecies",
+	"Species5": "DOM_InvasiveSpecies",
+	"Staff": "DOM_DataRecorder",
+	"applicator": "DOM_DataRecorder",
+	"asso_Species_1": "DOM_InvasiveSpecies",
+	"asso_Species_2": "DOM_InvasiveSpecies",
+	"asso_Species_3": "DOM_InvasiveSpecies",
+	"asso_Species_4": "DOM_InvasiveSpecies",
+	"asso_Species_5": "DOM_InvasiveSpecies",
 	"formulation_Code": "Form_Code",
 	"grid_Scale": "Grid_Scale",
 	"retreat": "YesNo",
 	"road_Sides": "WeedLine_Buffer_Side",
 	"treatment_Mode": "AppMode",
-	"weed_Target": "SCI_WeedList",
+	"weed_Target": "DOM_InvasiveSpecies",
 
     }
     return switcher.get(fc, False) 
@@ -71,6 +67,7 @@ def check_field_in_dict(field):
 	return field_lookup(field)
 
 def make_domain_lookup_dict(fieldList):
+	# set to old db from Morgan it you want to "factory reset"
 	for field in fieldList:
 		if field[1] == '':
 			pass
@@ -79,6 +76,7 @@ def make_domain_lookup_dict(fieldList):
 
 def get_all_fields_list():
 	# Change to the original workspace to get a list of all the assinged domains
+	# returns a tuple of field name and domain name. Returns none if no domain assinged.
 	masterList = []
 	arcpy.env.workspace = os.path.join(ws, "TreatmentFiles")
 	fcs = arcpy.ListFeatureClasses()

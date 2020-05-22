@@ -16,7 +16,7 @@ except:
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
-run_stand_alone = False
+run_stand_alone = True
 
 class Toolbox(object):
     def __init__(self):
@@ -127,7 +127,9 @@ def run(data_ws, scratch_ws):
             fc_name = get_base_name(fc)
             for spp in species_list:
                 if spp:
+                    # Strip any weird characters from the name
                     spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
+
                     mem_name = "in_memory\\{}_{}".format(fc_name, spp_)
                     out_select_by_loc = "Select_{}_{}".format(fc_name, spp_)
                     
@@ -155,6 +157,10 @@ def run(data_ws, scratch_ws):
                     generate_output_grid(cut_fc, slices, fc, spatialref, spp)
                     generate_output_grid(no_cross_fc, no_cross, fc, spatialref, spp)
 
+    print_("Cleaning up temp data")
+    del grid_mem, mem_name
+    arcpy.Delete_management(mem_name)
+    arcpy.Delete_management(grid_mem)
 
     print_("Merging all joined features", "green")
     fcs = arcpy.ListFeatureClasses("*_joined")
