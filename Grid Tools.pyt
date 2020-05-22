@@ -16,7 +16,7 @@ except:
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
-run_stand_alone = True
+run_stand_alone = False
 
 class Toolbox(object):
     def __init__(self):
@@ -158,7 +158,6 @@ def run(data_ws, scratch_ws):
                     generate_output_grid(no_cross_fc, no_cross, fc, spatialref, spp)
 
     print_("Cleaning up temp data")
-    del grid_mem, mem_name
     arcpy.Delete_management(mem_name)
     arcpy.Delete_management(grid_mem)
 
