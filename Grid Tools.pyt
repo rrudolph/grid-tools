@@ -157,8 +157,10 @@ def run(data_ws, scratch_ws):
                     generate_output_grid(cut_fc, slices, fc, spatialref, spp)
                     generate_output_grid(no_cross_fc, no_cross, fc, spatialref, spp)
 
-    print_("Cleaning up temp data")
-    arcpy.Delete_management(mem_name)
+                    print_("Removing mem_name var")
+                    arcpy.Delete_management(mem_name)
+
+    print_("Removing grid_mem var")
     arcpy.Delete_management(grid_mem)
 
     print_("Merging all joined features", "green")

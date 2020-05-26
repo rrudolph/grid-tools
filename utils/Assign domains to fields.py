@@ -95,7 +95,7 @@ def get_fc_list():
 	arcpy.env.workspace = os.path.join(ws, "TreatmentFiles")
 	return arcpy.ListFeatureClasses()
 
-def  remove_all_domains(fcs):
+def remove_all_domains(fcs):
 	for fc in fcs:
 		print(fc)
 		fieldNames = [f.name for f in arcpy.ListFields(fc)]
@@ -104,7 +104,11 @@ def  remove_all_domains(fcs):
 			try:
 				arcpy.RemoveDomainFromField_management(fc, field)
 			except:
+				print("Error removing domain for {}".format(field))
 				pass
+
+
+
 
 # fields = get_all_fields_list()
 # make_domain_lookup_dict(fields)
