@@ -14,16 +14,16 @@ domain_list = [domain.name for domain in arcpy.da.ListDomains(inWorkspace)]
 
 for domainName in domain_list:
 	print(domainName)
-	outTable = os.path.join(scratch_ws, domainName + "_DomainToTable")
+	# outTable = os.path.join(scratch_ws, domainName + "_DomainToTable")
 
-	print("Running table to domain...")
-	arcpy.DomainToTable_management(in_workspace=inWorkspace,
-		domain_name=domainName,
-		out_table=outTable,
-		code_field="Code",
-		description_field="Description",
-		configuration_keyword="")
+	# print("Running table to domain...")
+	# arcpy.DomainToTable_management(in_workspace=inWorkspace,
+	# 	domain_name=domainName,
+	# 	out_table=outTable,
+	# 	code_field="Code",
+	# 	description_field="Description",
+	# 	configuration_keyword="")
 
-	arcpy.TableToTable_conversion(outTable, os.path.join(rootDir, "Domain files"), domainName + ".csv")
+	# arcpy.TableToTable_conversion(outTable, os.path.join(rootDir, "Domain files"), domainName + ".csv")
 
 print("Done.")

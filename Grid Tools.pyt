@@ -16,7 +16,7 @@ except:
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
-run_stand_alone = False
+run_stand_alone = True
 
 class Toolbox(object):
     def __init__(self):
@@ -52,7 +52,15 @@ class CutAndMergeCells(object):
         parameterType="Required",
         direction="Input")
 
-        params = [param0, param1]
+        param2 = arcpy.Parameter(
+        displayName="Grid",
+        name="in_grid",
+        datatype="GPString",
+        parameterType="Required",
+        direction="Input")
+
+
+        params = [param0, param1, param2]
         return params
 
     def isLicensed(self):
@@ -74,118 +82,13 @@ class CutAndMergeCells(object):
         """The source code of the tool."""
         data_ws = parameters[0].valueAsText
         scratch_ws = parameters[1].valueAsText
+        in_grid  = parameters[2].valueAsText
         global main_script
         main_script = False
-        run(data_ws, scratch_ws)
+        run(data_ws, scratch_ws, in_grid)
 
         return
 
-def run(data_ws, scratch_ws):
-    '''
-    Run the main program that accepts workspaces.
-    data_ws: the workspace where all the data exists.
-    scratch_ws: an empty scratch workspace to put output data.
-    '''
-
-    arcpy.env.workspace = scratch_ws
-    arcpy.env.overwriteOutput = True
-
-
-    inGrid = os.path.join(data_ws, "NCI_Grids", "NCI_Grid_25m")
-    cutter = os.path.join(data_ws, "TreatmentFiles", "Cut_Line" )
-    final_fc = "Merge_Test"
-    input_id = "IDPK"
-
-    weed_field_list = ["weed_Target"]
-    other_field_list = ["Species1", "Species2","Species3","Species4","Species5",]
-
-    fc_list = [
-        [os.path.join(data_ws, "TreatmentFiles", "Weed_Point"), weed_field_list],
-        [os.path.join(data_ws, "TreatmentFiles", "Weed_Line"), weed_field_list],
-        [os.path.join(data_ws, "TreatmentFiles", "No_Target_Point"), other_field_list],
-        [os.path.join(data_ws, "TreatmentFiles", "No_Target_Line"), other_field_list],
-        [os.path.join(data_ws, "TreatmentFiles", "No_Treatment_Point"), other_field_list],
-        [os.path.join(data_ws, "TreatmentFiles", "No_Treatment_Line"), other_field_list]
-        ]
-
-    grid_mem = make_mem_name(inGrid)
-
-    print_("Making feature layer")
-    arcpy.MakeFeatureLayer_management(inGrid, grid_mem) 
-
-    spatialref = arcpy.Describe(inGrid).spatialReference
-
-    check_scratch_db()
-
-    for list_ in fc_list:
-        fc = list_[0]
-        fields = list_[1]
-        print_("Running " + fc, "red")
-        for field in fields:
-            species_list = get_unique_values(fc, field)
-            print_("Species List for field {}:  {}".format(field, str(species_list)), "green")
-            fc_name = get_base_name(fc)
-            for spp in species_list:
-                if spp:
-                    # Strip any weird characters from the name
-                    spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
-
-                    mem_name = "in_memory\\{}_{}".format(fc_name, spp_)
-                    out_select_by_loc = "Select_{}_{}".format(fc_name, spp_)
-                    
-                    exp = "{} = '{}'".format(field, spp)
-
-                    print_("Selecting {}".format(mem_name), "magenta")
-                    arcpy.Select_analysis(in_features=fc,
-                        out_feature_class=mem_name, 
-                        where_clause=exp)
-
-                    print_("Selecting by location for {}".format(mem_name))
-                    arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', mem_name)
-
-                    print_("Copying fc")
-                    arcpy.CopyFeatures_management(grid_mem, out_select_by_loc)
-
-                    lines = get_geom(cutter, input_id)
-                    polygons = get_geom(out_select_by_loc, input_id)
-
-                    slices, no_cross = cut(lines, polygons)
-
-                    cut_fc = os.path.join(scratch_ws, fc_name + "_grid_cut_" + spp_)
-                    no_cross_fc = os.path.join(scratch_ws, fc_name +"_no_cross_" +  spp_)
-
-                    generate_output_grid(cut_fc, slices, fc, spatialref, spp)
-                    generate_output_grid(no_cross_fc, no_cross, fc, spatialref, spp)
-
-                    print_("Removing mem_name var")
-                    arcpy.Delete_management(mem_name)
-
-    print_("Removing grid_mem var")
-    arcpy.Delete_management(grid_mem)
-
-    print_("Merging all joined features", "green")
-    fcs = arcpy.ListFeatureClasses("*_joined")
-    fieldmappings = arcpy.FieldMappings()
-    for fc in fcs:
-        print_("Adding fc {} to fieldmappings".format(fc))
-        fieldmappings.addTable(fc)
-
-    print_("Merging", "green")
-    arcpy.Merge_management(fcs, final_fc, fieldmappings)
-
-    # Check for overlaps
-    with arcpy.da.SearchCursor(final_fc, ['OID@', 'SHAPE@']) as cur:
-        for e1,e2 in itertools.combinations(cur, 2):
-            if e1[1].equals(e2[1]):
-                msg = '{} overlaps {}'.format(e1[0],e2[0])
-                print_(msg, "yellow")
-                calc_error_field(final_fc, msg, e2[0])
-
-    print_("Deleting unneeded fields", "red")
-    del_fields = other_field_list + ["Join_Count", "TARGET_FID"]
-    delete_fields(final_fc, del_fields)
-
-    print_("Done!", "green")
 
 def print_(text, color="black"):
     # Make fancy colored output if using the terminal. 
@@ -306,9 +209,31 @@ def get_geom(fc, inputID):
     del cursor  
     return geom
 
-def generate_output_grid(out_fc, geom, join_fc, sr, species):
+
+def get_action_type(fc):
+    '''The script selects by species name and appends that to the name of
+    the temporary in-memory fc.  This function strips the spp name out because
+    it is unessesary to put in the action type field. This is used towards the
+    end of the generate_output_grid() func. 
     '''
-    Creates a new featureclass based on cut or uncut geometry from the cut function.
+    prefix_list = [
+    "No_Target_Line",
+    "No_Target_Point",
+    "No_Treatment_Line",
+    "No_Treatment_Point",
+    "Weed_Line",
+    "Weed_Point",
+    ]
+
+    for prefix in prefix_list:
+        if fc.startswith(prefix):
+            return "'{}'".format(prefix)
+
+    else:
+        return "'{}'".format("Action type error")
+    
+def generate_output_grid(out_fc, geom, join_fc, sr, species):
+    ''' Creates a new featureclass based on cut or uncut geometry from the cut function.
     Does a spatial join from the source point or line feature. Adds needed fields.
     '''
     print_("Generating grid for " + out_fc, "yellow")
@@ -354,7 +279,7 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
     fieldName = get_base_name(join_fc)
     add_field(out_join, action_field, 50, "Action Type")
     print_("Calculating field")
-    arcpy.CalculateField_management(out_join, action_field, "'{}'".format(fieldName), "PYTHON_9.3", "")
+    arcpy.CalculateField_management(out_join, action_field, get_action_type(fieldName), "PYTHON_9.3", "")
 
     # Add weed target field if it doesn't exist. This is for the non-weed treatment features.
     weed_target = "weed_Target"
@@ -410,14 +335,151 @@ Please delete files from it and try again.
         print_("Scratch workspace empty, continuing...", "green")
 
 
+def convert_to_gdb(ws):
+    ws_gdb = ws.replace(".geodatabase", ".gdb")
+    if arcpy.Exists(ws_gdb):
+        print(f"{ws_gdb} already exists, skipping")
+        return ws_gdb
+    elif ws.endswith(".geodatabase"):
+        print(f"Converting to {ws_gdb}")
+        arcpy.conversion.MobileGdbToFileGdb(ws, ws_gdb)
+        return ws_gdb
+    else:
+        return ws
+
+def run(data_ws, scratch_ws, in_grid, select_date = None):
+    '''
+    Run the main program that accepts workspaces.
+    data_ws: the workspace where all the data exists.
+    scratch_ws: an empty scratch workspace to put output data.
+    '''
+
+    arcpy.env.workspace = scratch_ws
+    arcpy.env.overwriteOutput = True
+
+    data_ws = convert_to_gdb(data_ws)
+
+    cutter = os.path.join(data_ws, "Cut_Line" )
+    final_fc = "All_Features_Merge"
+    input_id = "IDPK"
+
+    weed_field_list = ["weed_Target"]
+    other_field_list = ["Species1", "Species2","Species3","Species4","Species5",]
+
+    fc_list = [
+        [os.path.join(data_ws, "Weed_Point"), weed_field_list],
+        [os.path.join(data_ws, "Weed_Line"), weed_field_list],
+        [os.path.join(data_ws, "No_Target_Point"), other_field_list],
+        [os.path.join(data_ws, "No_Target_Line"), other_field_list],
+        [os.path.join(data_ws, "No_Treatment_Point"), other_field_list],
+        [os.path.join(data_ws, "No_Treatment_Line"), other_field_list]
+        ]
+
+    grid_mem = make_mem_name(in_grid)
+
+    print_("Making feature layer")
+    arcpy.MakeFeatureLayer_management(in_grid, grid_mem) 
+
+    spatialref = arcpy.Describe(in_grid).spatialReference
+
+    check_scratch_db()
+
+    for list_ in fc_list:
+        fc = list_[0]
+        fields = list_[1]
+        print_("Running " + fc, "red")
+        for field in fields:
+            species_list = get_unique_values(fc, field)
+            print_("Species List for field {}:  {}".format(field, str(species_list)), "green")
+            fc_name = get_base_name(fc)
+            for spp in species_list:
+                if spp:
+                    # Strip any weird characters from the name
+                    spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
+
+                    temp_feature = "in_memory\\{}_{}".format(fc_name, spp_)
+                    out_select_grid_by_loc = "Select_grid_{}_{}".format(fc_name, spp_)
+                    
+                    if select_date:
+                        exp = "{} = '{}' And Action_Date >= timestamp '{}'".format(field, spp, select_date)
+                    else:
+                        exp = "{} = '{}'".format(field, spp)
+
+                    print_("Selecting grid {}".format(temp_feature), "magenta")
+                    arcpy.Select_analysis(in_features=fc,
+                        out_feature_class=temp_feature, 
+                        where_clause=exp)
+
+                    print_("Selecting by location for {}".format(temp_feature))
+                    arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', temp_feature)
+
+                    print_("Copying {}".format(fc_name))
+                    arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
+
+                    cutter_select = "Cutter_{}".format(spp_)
+
+                    print_("Selecting cut line to match species {}".format(cutter_select), "magenta")
+                    arcpy.Select_analysis(in_features=cutter,
+                        out_feature_class=cutter_select, 
+                        where_clause="Species = '{}'".format(spp))
+
+                    lines = get_geom(cutter_select, input_id)
+                    polygons = get_geom(out_select_grid_by_loc, input_id)
+
+                    slices, no_cross = cut(lines, polygons)
+
+                    cut_fc = os.path.join(scratch_ws, fc_name + "_grid_cut_" + spp_)
+                    no_cross_fc = os.path.join(scratch_ws, fc_name +"_no_cross_" +  spp_)
+
+                    generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
+                    generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
+
+                    print_("Removing temp_feature var")
+                    arcpy.Delete_management(temp_feature)
+
+    print_("Removing grid_mem var")
+    arcpy.Delete_management(grid_mem)
+
+    print_("Merging all joined features", "green")
+    fcs = arcpy.ListFeatureClasses("*_joined")
+    fieldmappings = arcpy.FieldMappings()
+    for fc in fcs:
+        print_("Adding fc {} to fieldmappings".format(fc))
+        fieldmappings.addTable(fc)
+
+    print_("Merging", "green")
+    arcpy.Merge_management(fcs, final_fc, fieldmappings)
+
+    # Check for overlaps
+    with arcpy.da.SearchCursor(final_fc, ['OID@', 'SHAPE@']) as cur:
+        for e1,e2 in itertools.combinations(cur, 2):
+            if e1[1].equals(e2[1]):
+                msg = '{} overlaps {}'.format(e1[0],e2[0])
+                print_(msg, "yellow")
+                calc_error_field(final_fc, msg, e2[0])
+
+    print_("Deleting unneeded fields", "red")
+    del_fields = other_field_list + ["Join_Count", "TARGET_FID"]
+    delete_fields(final_fc, del_fields)
+
+    print_("Calculating gross infested acres")
+    arcpy.management.CalculateGeometryAttributes(final_fc, "gross_Acres AREA_GEODESIC", '', "ACRES", "PROJCS['NAD_1983_UTM_Zone_11N',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-117.0],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]", "SAME_AS_INPUT")
+
+    print_("Updating local time field")
+    arcpy.management.ConvertTimeZone(final_fc, "Action_Date", "UTC", "Action_Date_Local", "Pacific_Standard_Time", "INPUT_NOT_ADJUSTED_FOR_DST", "OUTPUT_ADJUSTED_FOR_DST")
+    print_("Done!", "green")
+
 def stand_alone():
     global main_script
     main_script = True
 
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\NChannelIslandsTreatmentTemplate.gdb"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_566CD2C516634EB0B8E0084939978275.geodatabase"
+    in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Grids_DDDDF02CCD684674A036CA43219E9F5B.geodatabase\main.NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 
-    run(data_ws, scratch_ws)
+    select_date = "2020-10-13"
+
+    run(data_ws, scratch_ws, in_grid, select_date)
 
 if run_stand_alone:
     stand_alone()
