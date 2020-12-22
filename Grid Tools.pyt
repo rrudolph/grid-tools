@@ -7,7 +7,7 @@ Date 5/20/2020
 '''
 
 
-import arcpy, os, re, itertools
+import arcpy, os, re, itertools, yaml
 try:
     from colorama import Fore, Back, Style, init
     init()
@@ -334,18 +334,105 @@ Please delete files from it and try again.
     else:
         print_("Scratch workspace empty, continuing...", "green")
 
+def check_spatial_ref(fc):
+    """Checks for a specified spatial reference.  Exits if not met. 
+    """
+    sr_name = arcpy.Describe(fc).spatialReference.name
+    alias = arcpy.Describe(fc).spatialReference.alias
+    pcs_code = arcpy.Describe(fc).spatialReference.PCSCode
+    proj_code = arcpy.Describe(fc).spatialReference.projectionCode
+    proj_name = arcpy.Describe(fc).spatialReference.projectionName
+     
+    if not sr_name == "WGS_1984_Web_Mercator_Auxiliary_Sphere":
+        print_(f'''
+WARNING!
+Featureclass {fc} is not in WGS_1984_Web_Mercator_Auxiliary_Sphere,
+sr_name = {sr_name}
+alias = {alias}
+pcs_code = {pcs_code}
+proj_code = {proj_code}
+proj_name = {proj_name}
+It should be in Web Mercator so it can be properly projected into the standard NAD_1983_StatePlane_California_V_FIPS_0405
+used in this project.  
+''', "yellow")
+
+def get_fc_list(inWS:"Input workspace") -> "Full list of featureclasses":
+    """Temporarily sets the workspace and returns the full path and name of each fc."""
+    return_ = []
+    with arcpy.EnvManager(workspace=inWS):
+        fcs = arcpy.ListFeatureClasses()
+        for fc in fcs:
+            check_spatial_ref(fc)
+            desc = arcpy.Describe(fc)
+            catPath = desc.catalogPath
+            return_.append(catPath)
+    return return_
+
+def make_projected_gdb(gdb):
+    """ 
+    Makes a geodatabase with the same name but with _projected at the end. 
+    Input a path to a geodatabase. 
+    """
+    gdb_name = arcpy.Describe(gdb).name
+    projected_name = gdb_name.split(".")[0] + "_projected." + gdb_name.split(".")[1]
+    dir_name = os.path.dirname(gdb)
+    return_name = os.path.join(dir_name, projected_name)
+    print(f"Making new fileGDB: {return_name}")
+    arcpy.management.CreateFileGDB(dir_name, projected_name, "CURRENT")
+    return return_name
+
+def project_all_fcs(gdb):
+    """ 
+    Projects all fcs in the input geodatbase into State Plane. 
+    """
+    fcs = get_fc_list(gdb)
+    proj_gdb = make_projected_gdb(gdb)
+    for fc in fcs:
+        count = arcpy.GetCount_management(fc)
+        if int(count[0]) > 0:
+            # If the fc has features, reproject it.
+            name = arcpy.Describe(fc).name
+            print(f"Projecting {fc}")
+            arcpy.management.Project(fc, 
+                os.path.join(proj_gdb, name),
+                get_config("out_coor_system"),
+                get_config("transform_method"),
+                get_config("in_coor_system"),
+                "NO_PRESERVE_SHAPE",
+                None,
+                "NO_VERTICAL")
+
+
+        else:
+            # If it doesn't have features, make an empty projected place holder so
+            # it doesn't break the script later if it doesn't exist.
+            print_(f"Not projecting {fc}, no features present. Making empty fc.", "red")
+            name = arcpy.Describe(fc).name
+            geometry_type = arcpy.Describe(fc).shapeType
+            arcpy.CreateFeatureclass_management(proj_gdb,
+                name,
+                geometry_type,
+                fc,
+                "DISABLED",
+                "DISABLED",
+                get_config("out_coor_system"))
+
+    return proj_gdb
+
 
 def convert_to_gdb(ws):
     ws_gdb = ws.replace(".geodatabase", ".gdb")
-    if arcpy.Exists(ws_gdb):
-        print(f"{ws_gdb} already exists, skipping")
-        return ws_gdb
-    elif ws.endswith(".geodatabase"):
-        print(f"Converting to {ws_gdb}")
-        arcpy.conversion.MobileGdbToFileGdb(ws, ws_gdb)
-        return ws_gdb
-    else:
-        return ws
+    print(f"Converting to {ws_gdb}")
+    arcpy.conversion.MobileGdbToFileGdb(ws, ws_gdb)
+    converted_gdb = project_all_fcs(ws_gdb) 
+    return converted_gdb
+
+
+def get_config(config_item):
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_path,'config.yaml')) as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+        return data.get(config_item)
 
 def run(data_ws, scratch_ws, in_grid, select_date = None):
     '''
@@ -359,12 +446,13 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
 
     data_ws = convert_to_gdb(data_ws)
 
-    cutter = os.path.join(data_ws, "Cut_Line" )
-    final_fc = "All_Features_Merge"
-    input_id = "IDPK"
 
-    weed_field_list = ["weed_Target"]
-    other_field_list = ["Species1", "Species2","Species3","Species4","Species5",]
+    cutter = os.path.join(data_ws, "Cut_Line" )
+    final_fc = get_config("output_fc_name")
+    input_id = get_config("idpk_field")
+
+    weed_field_list = get_config("weed_field_list")
+    other_field_list = get_config("other_field_list")
 
     fc_list = [
         [os.path.join(data_ws, "Weed_Point"), weed_field_list],
@@ -463,21 +551,34 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
     delete_fields(final_fc, del_fields)
 
     print_("Calculating gross infested acres")
-    arcpy.management.CalculateGeometryAttributes(final_fc, "gross_Acres AREA_GEODESIC", '', "ACRES", "PROJCS['NAD_1983_UTM_Zone_11N',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-117.0],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]", "SAME_AS_INPUT")
+    arcpy.management.CalculateGeometryAttributes(final_fc,
+        "gross_Acres AREA_GEODESIC",
+        '',
+        "ACRES",
+        get_config("utm_proj_string"),
+        "SAME_AS_INPUT")
 
     print_("Updating local time field")
-    arcpy.management.ConvertTimeZone(final_fc, "Action_Date", "UTC", "Action_Date_Local", "Pacific_Standard_Time", "INPUT_NOT_ADJUSTED_FOR_DST", "OUTPUT_ADJUSTED_FOR_DST")
+    arcpy.management.ConvertTimeZone(final_fc,
+        "Action_Date",
+        "UTC",
+        "Action_Date_Local",
+        "Pacific_Standard_Time",
+        "INPUT_NOT_ADJUSTED_FOR_DST",
+        "OUTPUT_ADJUSTED_FOR_DST")
+
     print_("Done!", "green")
 
 def stand_alone():
     global main_script
     main_script = True
 
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_566CD2C516634EB0B8E0084939978275.geodatabase"
-    in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Grids_DDDDF02CCD684674A036CA43219E9F5B.geodatabase\main.NCI_Grid_25m"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_34D4C1C9DAF54769A7813353E103A34A.geodatabase"
+    in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 
-    select_date = "2020-10-13"
+    # select_date = "2020-10-13"
+    select_date = None
 
     run(data_ws, scratch_ws, in_grid, select_date)
 
