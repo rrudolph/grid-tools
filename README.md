@@ -14,7 +14,7 @@ run_stand_alone = False
 Running this script **requires** having a geodatabase set up with the correct featureclasses and fields. 
 
 
-##Updated workflow
+## Updated workflow
 
 ![ArcGIS Pro Download](https://github.com/rrudolph/grid-tools/blob/master/img/arcpro_download.jpg "Download")
 In ArcGIS Pro, zoom to area of interest for processing the grid data with your AGOL feature service the only thing in the map window. In the Map Ribbon, click Download.  this will put it in your current workspace directory as a ".geodatabase" sqlite file.  Point the script to this geodatabase to convert to a ".gdb" file and process the gid data. 
