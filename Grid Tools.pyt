@@ -190,6 +190,45 @@ def calc_error_field(fc, msg, val):
                 cursor.updateRow(row)
 
 
+
+def process_nia(fc):
+    '''Calculate net infested acres field.'''
+
+    def calc_nia(perc_cover, gia):
+        '''Calculate the net infested acres data. 
+        If 111 is detected as the percent conver, process it as
+        a trace.  Otherwise, convert the whole number to a percent value'''
+        if perc_cover > 100:
+            # print("Found trace")
+            return 0.001
+        else:
+            nia = (perc_cover*.01) * gia
+            # print(f"Calculating NIA: {nia}")
+            return nia
+
+    field_list = ["percent_Target", "gross_Acres", "net_Acres", 'OBJECTID', 'Action_Type']
+    acceptable_features = ["Weed_Line", "Weed_Point"]
+    error_list = []
+
+    print("Updating net infested acres...")
+    with arcpy.da.UpdateCursor(fc, field_list) as cursor:
+        for row in cursor:
+            action_type = row[4]
+            oid = row[3]
+            percent_Target = row[0]
+            gia = row[1]
+
+            if action_type in acceptable_features:      
+                # print(f"Processing oid: {oid}")
+
+                if percent_Target:
+                    row[2] = calc_nia(percent_Target, gia)
+                else:
+                    error_list.append(oid)
+                cursor.updateRow(row)
+
+    print(f"OIDs with percent cover error: {error_list}")
+
 def get_geom(fc, inputID):
     # Returns a list of geometry from input fc.
     fieldNames = [f.name for f in arcpy.ListFields(fc)]
@@ -355,6 +394,9 @@ proj_name = {proj_name}
 It should be in Web Mercator so it can be properly projected into the standard NAD_1983_StatePlane_California_V_FIPS_0405
 used in this project.  
 ''', "yellow")
+
+    else:
+        print_(f"Featureclass {fc} is good: {sr_name}", "green")
 
 def get_fc_list(inWS:"Input workspace") -> "Full list of featureclasses":
     """Temporarily sets the workspace and returns the full path and name of each fc."""
@@ -558,6 +600,9 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
         get_config("utm_proj_string"),
         "SAME_AS_INPUT")
 
+    print_("Calculating net infested acres")
+    process_nia(final_fc)
+
     print_("Updating local time field")
     arcpy.management.ConvertTimeZone(final_fc,
         "Action_Date",
@@ -573,7 +618,7 @@ def stand_alone():
     global main_script
     main_script = True
 
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_34D4C1C9DAF54769A7813353E103A34A.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_D27F07CE71AD4AC6AFD09BE4DC3D89D3.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 

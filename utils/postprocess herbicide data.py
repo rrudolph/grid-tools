@@ -4,10 +4,10 @@ import pandas as pd
 # fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_F400A963108049BC9AF700A5BB26EE9B.gdb\Weed_Line"
 
 # weed point
-# fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/0" 
+fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/0" 
 
 # weed line
-fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/1" 
+# fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/1" 
 
 xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\CHIS_Formulation_Codes.xlsx"
 
@@ -50,11 +50,17 @@ def get_form_code_data(xlsx):
 
 def data_lookup(df, row, column):
 	# print(f"DF: {df}")
-	# print(f"row: {row}")
-	# print(f"col: {column}")
+	print(f"row: {row}")
+	print(f"col: {column}")
 
-	df = df.set_index("formulation_Code", drop = False) 
-	return df.loc[row, column]
+	df = df.set_index("formulation_Code", drop = False)
+	try:
+		val = df.loc[row, column]
+		print(val)
+		return val
+		
+	except KeyError:
+		return None
 
 
 def calc_oz(wet_rate, finished_Gallons, finished_Ounces):

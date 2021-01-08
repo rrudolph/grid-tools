@@ -1,6 +1,6 @@
 import os, arcpy
 
-ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\NChannelIslandsTreatmentTemplate.gdb"
+ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb"
 
 arcpy.env.workspace = os.path.join(ws, "NCI_Grids")
 
