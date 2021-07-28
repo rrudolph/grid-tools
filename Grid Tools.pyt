@@ -314,7 +314,7 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
     arcpy.SpatialJoin_analysis(target_features=out_fc, 
         join_features=join_fc, 
         out_feature_class=out_join,
-        join_operation="JOIN_ONE_TO_ONE",
+        join_operation="JOIN_ONE_TO_MANY",
         join_type="KEEP_COMMON", 
         field_mapping=fieldmappings,
         match_option="INTERSECT", 
@@ -552,8 +552,8 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
                 # Strip any weird characters from the name
                 spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
 
-                temp_feature = "in_memory\\{}_{}".format(fc_name, spp_)
-                out_select_grid_by_loc = "Select_grid_{}_{}".format(fc_name, spp_)
+                temp_feature = f"{fc_name}_{spp_}_temp_spp_select"
+                out_select_grid_by_loc = f"Select_grid_{fc_name}_{spp_}"
                 
                 if select_date:
                     exp = "{} = '{}' And Action_Date >= timestamp '{}'".format(field, spp, select_date)
@@ -589,8 +589,7 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
                 generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
                 generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
 
-                print_("Removing temp_feature var")
-                arcpy.Delete_management(temp_feature)
+
 
     print_("Removing grid_mem var")
     arcpy.Delete_management(grid_mem)
@@ -656,7 +655,7 @@ def stand_alone():
     global master_cross_list
     master_cross_list = []
     main_script = True
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_A799A291CD9E494F89FC3236675F3C05.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BE666343FA89456585A067178081D0AF.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 
