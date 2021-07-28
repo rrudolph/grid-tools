@@ -1,6 +1,6 @@
 import arcpy
 
-out_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\SBI_Grid.gdb\NCI_Grid_25m_with_SBI_2_sbi_only_12_5m_2"
+out_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\SBI_Grid.gdb\NCI_Grid_25m_with_SBI_2_sbi_only_12_5m"
 in_fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\SBI_Grid.gdb\SBI_CUSP2"
 
 

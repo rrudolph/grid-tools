@@ -8,6 +8,9 @@ Date 5/20/2020
 
 
 import arcpy, os, re, itertools, yaml
+from collections import Counter
+from icecream import ic
+from timeit import default_timer as timer
 try:
     from colorama import Fore, Back, Style, init
     init()
@@ -89,6 +92,13 @@ class CutAndMergeCells(object):
 
         return
 
+def elapsed_time(start,end):
+    '''
+    Print the elapsed time of how long something took.
+    User will need to specify start and end times in the main script
+    for each process needing timing. Use start = timer() and end = timer()
+    '''
+    print("Elapsed time: " + str(round((end - start) / 60, 2)) + " min")
 
 def print_(text, color="black"):
     # Make fancy colored output if using the terminal. 
@@ -137,7 +147,7 @@ def get_base_name(fc):
 def get_unique_values(fc, field):
     # Returns unique values of a field into a sorted list
     with arcpy.da.SearchCursor(fc, [field]) as cursor:
-        return {row[0] for row in cursor}
+        return {row[0] for row in cursor if row[0] is not None}
 
 def make_mem_name(fc):
     # Make an in-memory temporary featureclass
@@ -200,7 +210,7 @@ def process_nia(fc):
         a trace.  Otherwise, convert the whole number to a percent value'''
         if perc_cover > 100:
             # print("Found trace")
-            return 0.001
+            return 0.009
         else:
             nia = (perc_cover*.01) * gia
             # print(f"Calculating NIA: {nia}")
@@ -329,7 +339,6 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
         arcpy.CalculateField_management(out_join, weed_target, "'{}'".format(species), "PYTHON_9.3", "")
 
 
-
 def cut(lines, polygons):
     '''
     Cut a cell by a line. Put into two lists of geometry, cells that got cut,
@@ -346,6 +355,7 @@ def cut(lines, polygons):
                 if line.crosses(poly):
                     print_("{} crosses {}".format(line_id, poly_id))
                     crossed_list.append(poly_id)
+                    master_cross_list.append(poly_id)
                     try:
                         slice1, slice2 = poly.cut(line)  
                         slices.insert(0, (slice1, poly_id, "Left Cut"))  
@@ -359,6 +369,7 @@ def cut(lines, polygons):
             if line_count >= len(lines) and poly_id not in crossed_list:
                 no_cross.insert(0, (poly, poly_id, "No Cross"))
 
+    print(f"Cross List: {crossed_list}")
     return slices, no_cross
 
 
@@ -427,6 +438,7 @@ def project_all_fcs(gdb):
     """ 
     Projects all fcs in the input geodatbase into State Plane. 
     """
+    print("Projecting all fcs")
     fcs = get_fc_list(gdb)
     proj_gdb = make_projected_gdb(gdb)
     for fc in fcs:
@@ -462,32 +474,46 @@ def project_all_fcs(gdb):
     return proj_gdb
 
 
+def copy_mobile_to_gdb(in_ws, out_ws):
+    with arcpy.EnvManager(workspace=in_ws):
+        fcs = arcpy.ListFeatureClasses()
+        for fc in fcs:
+            new_fc = fc.replace("main.", "")
+            print(fc, new_fc)
+            out_fc = os.path.join(out_ws, new_fc)
+            print(f"Copying to {out_fc}")
+            arcpy.management.CopyFeatures(fc, out_fc, '', None, None, None)
+
 def convert_to_gdb(ws):
     ws_gdb = ws.replace(".geodatabase", ".gdb")
+    ws_gdb_name = ws_gdb.split("\\")[-1]
+    dir_name = os.path.dirname(ws)
+    ic(ws_gdb, dir_name, ws_gdb_name)
+    arcpy.management.CreateFileGDB(dir_name, ws_gdb_name, "CURRENT")
     print(f"Converting to {ws_gdb}")
-    arcpy.conversion.MobileGdbToFileGdb(ws, ws_gdb)
+    copy_mobile_to_gdb(ws, ws_gdb)
     converted_gdb = project_all_fcs(ws_gdb) 
     return converted_gdb
-
 
 def get_config(config_item):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(dir_path,'config.yaml')) as f:
-        data = yaml.load(f, Loader=yaml.FullLoader)
+        data = yaml.safe_load(f)
         return data.get(config_item)
 
 def run(data_ws, scratch_ws, in_grid, select_date = None):
     '''
-    Run the main program that accepts workspaces.
+    Run the main program.
     data_ws: the workspace where all the data exists.
     scratch_ws: an empty scratch workspace to put output data.
+    in_grid: master reference grid data will be attached to.
+    select_date: optional, used to select out only past a certain date if desired.
     '''
 
     arcpy.env.workspace = scratch_ws
     arcpy.env.overwriteOutput = True
 
     data_ws = convert_to_gdb(data_ws)
-
 
     cutter = os.path.join(data_ws, "Cut_Line" )
     final_fc = get_config("output_fc_name")
@@ -523,62 +549,57 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
             print_("Species List for field {}:  {}".format(field, str(species_list)), "green")
             fc_name = get_base_name(fc)
             for spp in species_list:
-                if spp:
-                    # Strip any weird characters from the name
-                    spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
+                # Strip any weird characters from the name
+                spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
 
-                    temp_feature = "in_memory\\{}_{}".format(fc_name, spp_)
-                    out_select_grid_by_loc = "Select_grid_{}_{}".format(fc_name, spp_)
-                    
-                    if select_date:
-                        exp = "{} = '{}' And Action_Date >= timestamp '{}'".format(field, spp, select_date)
-                    else:
-                        exp = "{} = '{}'".format(field, spp)
+                temp_feature = "in_memory\\{}_{}".format(fc_name, spp_)
+                out_select_grid_by_loc = "Select_grid_{}_{}".format(fc_name, spp_)
+                
+                if select_date:
+                    exp = "{} = '{}' And Action_Date >= timestamp '{}'".format(field, spp, select_date)
+                else:
+                    exp = "{} = '{}'".format(field, spp)
 
-                    print_("Selecting grid {}".format(temp_feature), "magenta")
-                    arcpy.Select_analysis(in_features=fc,
-                        out_feature_class=temp_feature, 
-                        where_clause=exp)
+                print_("Selecting grid {}".format(temp_feature), "magenta")
+                arcpy.Select_analysis(in_features=fc,
+                    out_feature_class=temp_feature, 
+                    where_clause=exp)
 
-                    print_("Selecting by location for {}".format(temp_feature))
-                    arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', temp_feature)
+                print_("Selecting by location for {}".format(temp_feature))
+                arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', temp_feature)
 
-                    print_("Copying {}".format(fc_name))
-                    arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
+                print_("Copying {}".format(fc_name))
+                arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
 
-                    cutter_select = "Cutter_{}".format(spp_)
+                cutter_select = "Cutter_{}".format(spp_)
 
-                    print_("Selecting cut line to match species {}".format(cutter_select), "magenta")
-                    arcpy.Select_analysis(in_features=cutter,
-                        out_feature_class=cutter_select, 
-                        where_clause="Species = '{}'".format(spp))
+                print_("Selecting cut line to match species {}".format(cutter_select), "magenta")
+                arcpy.Select_analysis(in_features=cutter,
+                    out_feature_class=cutter_select, 
+                    where_clause="Species = '{}'".format(spp))
 
-                    lines = get_geom(cutter_select, input_id)
-                    polygons = get_geom(out_select_grid_by_loc, input_id)
+                lines = get_geom(cutter_select, input_id)
+                polygons = get_geom(out_select_grid_by_loc, input_id)
 
-                    slices, no_cross = cut(lines, polygons)
+                slices, no_cross = cut(lines, polygons)
 
-                    cut_fc = os.path.join(scratch_ws, fc_name + "_grid_cut_" + spp_)
-                    no_cross_fc = os.path.join(scratch_ws, fc_name +"_no_cross_" +  spp_)
+                cut_fc = os.path.join(scratch_ws, fc_name + "_grid_cut_" + spp_)
+                no_cross_fc = os.path.join(scratch_ws, fc_name +"_no_cross_" +  spp_)
 
-                    generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
-                    generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
+                generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
+                generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
 
-                    print_("Removing temp_feature var")
-                    arcpy.Delete_management(temp_feature)
+                print_("Removing temp_feature var")
+                arcpy.Delete_management(temp_feature)
 
     print_("Removing grid_mem var")
     arcpy.Delete_management(grid_mem)
 
     print_("Merging all joined features", "green")
     fcs = arcpy.ListFeatureClasses("*_joined")
-    fieldmappings = arcpy.FieldMappings()
-    for fc in fcs:
-        print_("Adding fc {} to fieldmappings".format(fc))
-        fieldmappings.addTable(fc)
 
     print_("Merging", "green")
-    arcpy.Merge_management(fcs, final_fc, fieldmappings)
+    arcpy.Merge_management(fcs, final_fc)
 
     # Check for overlaps
     with arcpy.da.SearchCursor(final_fc, ['OID@', 'SHAPE@']) as cur:
@@ -612,20 +633,39 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
         "INPUT_NOT_ADJUSTED_FOR_DST",
         "OUTPUT_ADJUSTED_FOR_DST")
 
+
+    print_("Calculating number of crosses on grid cells")
+    counter = Counter(master_cross_list)
+    print(f"Master cross list count: {counter}")
+    add_field(final_fc, "Times_Crossed", 25)
+    with arcpy.da.UpdateCursor(final_fc, ["SOURCE_ID", "Times_Crossed"]) as cursor:
+
+        for row in cursor:
+            for id_, count in counter.items():
+                if row[0] == id_:
+                    print_(f"Found match: {row[0]}")
+
+                    row[1] = count
+                    cursor.updateRow(row)
+
+
     print_("Done!", "green")
 
 def stand_alone():
     global main_script
+    global master_cross_list
+    master_cross_list = []
     main_script = True
-
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_D27F07CE71AD4AC6AFD09BE4DC3D89D3.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_A799A291CD9E494F89FC3236675F3C05.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 
     # select_date = "2020-10-13"
     select_date = None
 
+    start = timer()
     run(data_ws, scratch_ws, in_grid, select_date)
-
+    end = timer()
+    elapsed_time(start, end)
 if run_stand_alone:
     stand_alone()

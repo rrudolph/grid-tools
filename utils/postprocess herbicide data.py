@@ -1,7 +1,10 @@
 import  arcpy
 import pandas as pd
+from icecream import ic
+import sys
 
-# fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_F400A963108049BC9AF700A5BB26EE9B.gdb\Weed_Line"
+# Test fc
+# fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_0D80FC137C914476BB65EFD985B8C948.geodatabase\main.Weed_Point"
 
 # weed point
 fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/0" 
@@ -9,7 +12,7 @@ fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Feature
 # weed line
 # fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/1" 
 
-xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\CHIS_Formulation_Codes.xlsx"
+xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\CHIS_Formulation_Codes_6-9-21.xlsx"
 
 field_list = [
 	"formulation_Code",
@@ -38,10 +41,33 @@ field_list = [
 	"adjuvant_1_Rate",
 	"adjuvant_2_Trade",
 	"adjuvant_2_EPA",
-	"adjuvant_2_Rate"
+	"adjuvant_2_Rate",
+	"OBJECTID"
 	]
 
 ## Functions
+def get_unique_agol(fc, field):
+	with arcpy.da.SearchCursor(fc, [field]) as cursor:
+		return {row[0] for row in cursor}
+
+
+def get_unique_excel(xlsx):
+	xls = pd.ExcelFile(xlsx)
+	sheet = xls.sheet_names[0]
+	return list(xls.parse(sheet)["formulation_Code"])
+
+def check_mismatch():
+	print("Checking for missing form codes")
+	fc_vals = get_unique_agol(fc, "formulation_Code")
+	excel_vals = get_unique_excel(xlsx)
+
+	for val in fc_vals:
+		if val not in excel_vals and val is not None:
+			sys.exit(f"Found missing val {val} not in excel list")
+	else:
+		print("No mismatch found")
+
+
 def get_form_code_data(xlsx):
 	xls = pd.ExcelFile(xlsx)
 	sheet = xls.sheet_names[0]
@@ -49,21 +75,23 @@ def get_form_code_data(xlsx):
 	return df
 
 def data_lookup(df, row, column):
-	# print(f"DF: {df}")
-	print(f"row: {row}")
-	print(f"col: {column}")
+	# ic(df)
+	# ic(row)
+	# ic(column)
 
 	df = df.set_index("formulation_Code", drop = False)
 	try:
 		val = df.loc[row, column]
-		print(val)
+		ic(val)
 		return val
 		
-	except KeyError:
+	except:
+		print("Lookup error.")
 		return None
 
 
 def calc_oz(wet_rate, finished_Gallons, finished_Ounces):
+	ic(finished_Gallons)
 	if finished_Gallons:
 		return wet_rate*(finished_Gallons*128)
 	elif finished_Ounces:
@@ -71,10 +99,8 @@ def calc_oz(wet_rate, finished_Gallons, finished_Ounces):
 
 
 def calc_lbs(dry_rate, finished_Gallons, finished_Ounces):
-	if finished_Gallons:
-		return (dry_rate/16)*(finished_Gallons/100)
-	elif finished_Ounces:
-		return (dry_rate/16)*((finished_Ounces*128)/100)
+	'''Need to figure out how to calculate pounds'''
+	pass
 
 
 ## For generating the lookup index for the fields
@@ -83,9 +109,15 @@ def calc_lbs(dry_rate, finished_Gallons, finished_Ounces):
 
 herb_df = get_form_code_data(xlsx)
 
+bad_form_codes = []
+
+check_mismatch()
+
 print("Processing herbicide data...")
 with arcpy.da.UpdateCursor(fc, field_list) as cursor:
 	for row in cursor:
+		oid = row[27]
+		print(f"{'-'*29} Processing row {oid}")
 		# Read data
 		formulation_Code = row[0]
 		finished_Gallons = row[1]
@@ -117,27 +149,37 @@ with arcpy.da.UpdateCursor(fc, field_list) as cursor:
 		adjuvant_2_EPA = row[25]
 		adjuvant_2_Rate = row[26]
 
+		# Test if form code returns none. Procede with data copy if not.
+
 		# Lookup and copy
-		row[3] = data_lookup(herb_df, formulation_Code, "chemical_1")
-		row[4] = data_lookup(herb_df, formulation_Code, "chemical_1_Trade")
-		row[5] = data_lookup(herb_df, formulation_Code, "chem_1_EPA")
+		try:
+			row[3] = data_lookup(herb_df, formulation_Code, "chemical_1")
+			row[4] = data_lookup(herb_df, formulation_Code, "chemical_1_Trade")
+			row[5] = data_lookup(herb_df, formulation_Code, "chem_1_EPA")
 
-		row[12] = data_lookup(herb_df, formulation_Code, "chem_2")
-		row[13] = data_lookup(herb_df, formulation_Code, "chemical_2_Trade")
-		row[14] = data_lookup(herb_df, formulation_Code, "chem_2_EPA")
+			row[12] = data_lookup(herb_df, formulation_Code, "chem_2")
+			row[13] = data_lookup(herb_df, formulation_Code, "chemical_2_Trade")
+			row[14] = data_lookup(herb_df, formulation_Code, "chem_2_EPA")
 
-		chem_1_WetRate = data_lookup(herb_df, formulation_Code, "chem_1_WetRate")
-		chem_2_WetRate = data_lookup(herb_df, formulation_Code, "chem_2_WetRate")
-		row[6] = chem_1_WetRate
-		row[15] = chem_2_WetRate
-		
+			chem_1_WetRate = data_lookup(herb_df, formulation_Code, "chem_1_WetRate")
+			chem_2_WetRate = data_lookup(herb_df, formulation_Code, "chem_2_WetRate")
+			row[6] = chem_1_WetRate
+			row[15] = chem_2_WetRate
+			
+			# Calculations
+			# ic(formulation_Code)
+			# ic(chem_1_WetRate)
+			# ic(finished_Gallons)
+			# ic(finished_Ounces)
+			row[10] = calc_oz(chem_1_WetRate, finished_Gallons, finished_Ounces)
+			row[19] = calc_oz(chem_2_WetRate, finished_Gallons, finished_Ounces)
+						
+			cursor.updateRow(row)
+		except:
+			print("Error")
+			bad_form_codes.append(formulation_Code)
 
-		# Calculations
-		row[10] = calc_oz(chem_1_WetRate, finished_Gallons, finished_Ounces)
-		row[19] = calc_oz(chem_2_WetRate, finished_Gallons, finished_Ounces)
-		
-
-		
-		cursor.updateRow(row)
+			
+print(f"Bad form code list: {set(bad_form_codes)}")
 
 print("Done.")
