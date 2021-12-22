@@ -26,13 +26,16 @@ def get_agol_doms(db, dom_name):
 #--------- Run it.
 
 db ="https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer"
-xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\CHIS_Formulation_Codes_6-9-21.xlsx"
+# xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\CHIS_Formulation_Codes_8-29-21.xlsx"
+# xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\archive\CHIS_Formulation_Codes_6-9-21.xlsx"
+xlsx = r"C:\Users\RRudolph\OneDrive - DOI\CHIS Invasives\CHIS_Formulation_Codes.xlsx"
 
 # agol_dom = 'Weed_Point_formulation_Code_a3bf946ca94440d7b0a3f1299085b7f4'
 agol_dom = 'DOM_FormCode'
 
 xlsx_domains = sorted(get_excel_doms(xlsx))
 agol_domains = get_agol_doms(db, agol_dom)
+
 
 for x in xlsx_domains:
 	for a in agol_domains:

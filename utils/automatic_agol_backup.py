@@ -1,5 +1,5 @@
 '''
-Make a compressed tar file of the CHIS Invasives Grid AGOL database.
+Make a compressed zip file of the CHIS Invasives Grid AGOL database.
 Script makes a new file GDB, adds all feature services to it, compresses
 it, then deletes the GDB. Also logs all activity. 
 
@@ -7,7 +7,8 @@ Useful in case AGOL gets hacked, corrupted, or users accidentally delete/screw u
 
 Optionally use windows Task Scheduler to automatically run at desired interval.
 
-To extract, use cygwin or powershell
+Used to use a tar file to compress but it was giving me issues with the .lock file.
+For those older tar files: to extract, use cygwin or powershell
 command line example: tar -xzvf AGOL_Grid_DB_Backup_20210630091023.gdb.tar.gz
 will unpack to make AGOL_Grid_DB_Backup_20210630091023.gdb in the same folder.
 
@@ -20,7 +21,7 @@ import arcpy
 import time
 import logging
 import os
-import tarfile
+import zipfile
 
 # Optional debugger 
 try:
@@ -38,19 +39,32 @@ def plog(msg, msg_type="info"):
 		logger.error(msg)
 
 
-def make_tarfile(source):
-	''' Generate a compressed tarfile'''
-	# archive name is name of gdb, to prevent it from extracting into a big tree of folders
-	arcname = source.split("\\")[-1]
-	# ic(arcname)
-	target = f"{source}.tar.gz"
-	plog(f"Making tarfile {target}")
-	with tarfile.open(target, "w:gz") as tar:
-		tar.add(source, arcname=arcname)
+def zip_ws(path, zip):
+	'''Zip a file gdb, skip lock files'''
+	global zip_success
+	try:
+		files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+		for file in files:
+			if not file.endswith('.lock'):
+				print(f"Zipping {file}...")
+				try:
+					zip.write(os.path.join(path, file), arcname=file)
+
+				except Exception as e:
+					print(f"    Error adding {file}: {e}")
+
+		plog("Zip successful")
+		zip_success = True
+
+	except Exception as e:
+		plog(f"Zip failed: {e}")
+		zip_success = False
 
 def get_fc_count(fc):
 	''' Get the number of features. Optional but good to log '''
 	return arcpy.management.GetCount(fc)[0]
+
+
 
 # Vars
 archive_dir = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Archive"
@@ -94,7 +108,7 @@ def main():
 	try:
 		plog(f"Creating {db_name}")
 		arcpy.management.CreateFileGDB(archive_dir, db_name, "CURRENT")
-
+		
 		for fc_name, url in fc_dict.items():
 			feat_count = get_fc_count(url)
 			arcpy.conversion.FeatureClassToFeatureClass(url, 
@@ -103,14 +117,24 @@ def main():
 				None, None, None)
 			plog(f"Success downloading {fc_name}. Feature count: {feat_count}")
 
-		make_tarfile(out_db)
 		
-		arcpy.management.Delete(out_db)
-		plog(f"Deleted {out_db}")
-
-
 	except Exception as e:
 		plog(f"An error occurred with {fc_name}. Message: {e}", "error")
+
+
+	try:
+		out_zip = out_db + ".zip"
+		plog(f"Generating zip file: {out_zip}")
+		with zipfile.ZipFile(out_zip, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+			zip_ws(out_db, zip_file)
+
+		if zip_success:
+			plog(f"Deleting file gdb... {out_db}")
+			arcpy.Delete_management(out_db)
+
+	except Exception as e:
+		plog(f"Error making zip file. Message: {e}", "error")
+
 
 if __name__ == '__main__':
 	main()

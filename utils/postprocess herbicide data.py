@@ -3,16 +3,13 @@ import pandas as pd
 from icecream import ic
 import sys
 
-# Test fc
-# fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_0D80FC137C914476BB65EFD985B8C948.geodatabase\main.Weed_Point"
+# Don't edit the live service!  Use a .geodatabase sync copy to do big edits like this.
+# fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_931AFC4EE8FE4F50920839F44961ED47.geodatabase\main.Weed_Point"
+fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_931AFC4EE8FE4F50920839F44961ED47.geodatabase\main.Weed_Line"
 
-# weed point
-fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/0" 
 
-# weed line
-# fc = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/1" 
-
-xlsx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\grid-tools\CHIS_Formulation_Codes_6-9-21.xlsx"
+# Now on OneDrive
+xlsx = r"C:\Users\RRudolph\OneDrive - DOI\CHIS Invasives\CHIS_Formulation_Codes.xlsx"
 
 field_list = [
 	"formulation_Code",
@@ -46,7 +43,7 @@ field_list = [
 	]
 
 ## Functions
-def get_unique_agol(fc, field):
+def get_unique_fc(fc, field):
 	with arcpy.da.SearchCursor(fc, [field]) as cursor:
 		return {row[0] for row in cursor}
 
@@ -58,7 +55,7 @@ def get_unique_excel(xlsx):
 
 def check_mismatch():
 	print("Checking for missing form codes")
-	fc_vals = get_unique_agol(fc, "formulation_Code")
+	fc_vals = get_unique_fc(fc, "formulation_Code")
 	excel_vals = get_unique_excel(xlsx)
 
 	for val in fc_vals:
@@ -167,12 +164,14 @@ with arcpy.da.UpdateCursor(fc, field_list) as cursor:
 			row[15] = chem_2_WetRate
 			
 			# Calculations
-			# ic(formulation_Code)
-			# ic(chem_1_WetRate)
-			# ic(finished_Gallons)
-			# ic(finished_Ounces)
+			ic(formulation_Code)
+			ic(chem_1_WetRate)
+			ic(finished_Gallons)
+			ic(finished_Ounces)
 			row[10] = calc_oz(chem_1_WetRate, finished_Gallons, finished_Ounces)
 			row[19] = calc_oz(chem_2_WetRate, finished_Gallons, finished_Ounces)
+			ic(row[10])
+			ic(row[19])
 						
 			cursor.updateRow(row)
 		except:

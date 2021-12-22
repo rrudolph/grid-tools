@@ -7,7 +7,12 @@ Date 5/20/2020
 '''
 
 
-import arcpy, os, re, itertools, yaml
+import arcpy
+import re
+import itertools
+import yaml
+import pathlib
+from os.path import join
 from collections import Counter
 from icecream import ic
 from timeit import default_timer as timer
@@ -185,6 +190,10 @@ def delete_fields(fc, fieldList):
         except:
             print_("Error deleting field " + field, "red")
 
+
+def strip_non_alphanum(string):
+    return re.sub('[^0-9a-zA-Z]+', '_', string)
+
 def calc_error_field(fc, msg, val):
     # Calculates the sub id based on the input val (or key, 
     # or ID, whatever you want to call it)
@@ -198,8 +207,6 @@ def calc_error_field(fc, msg, val):
 
                 row[1] = msg
                 cursor.updateRow(row)
-
-
 
 def process_nia(fc):
     '''Calculate net infested acres field.'''
@@ -287,8 +294,8 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
     '''
     print_("Generating grid for " + out_fc, "yellow")
     print_("Creating output feature class")
-    arcpy.CreateFeatureclass_management(os.path.dirname(out_fc),
-        os.path.basename(out_fc), 
+    arcpy.CreateFeatureclass_management(dirname(out_fc),
+        basename(out_fc), 
         "POLYGON", 
         spatial_reference = sr)
 
@@ -428,8 +435,8 @@ def make_projected_gdb(gdb):
     """
     gdb_name = arcpy.Describe(gdb).name
     projected_name = gdb_name.split(".")[0] + "_projected." + gdb_name.split(".")[1]
-    dir_name = os.path.dirname(gdb)
-    return_name = os.path.join(dir_name, projected_name)
+    dir_name = dirname(gdb)
+    return_name = join(dir_name, projected_name)
     print(f"Making new fileGDB: {return_name}")
     arcpy.management.CreateFileGDB(dir_name, projected_name, "CURRENT")
     return return_name
@@ -448,7 +455,7 @@ def project_all_fcs(gdb):
             name = arcpy.Describe(fc).name
             print(f"Projecting {fc}")
             arcpy.management.Project(fc, 
-                os.path.join(proj_gdb, name),
+                join(proj_gdb, name),
                 get_config("out_coor_system"),
                 get_config("transform_method"),
                 get_config("in_coor_system"),
@@ -480,14 +487,14 @@ def copy_mobile_to_gdb(in_ws, out_ws):
         for fc in fcs:
             new_fc = fc.replace("main.", "")
             print(fc, new_fc)
-            out_fc = os.path.join(out_ws, new_fc)
+            out_fc = join(out_ws, new_fc)
             print(f"Copying to {out_fc}")
             arcpy.management.CopyFeatures(fc, out_fc, '', None, None, None)
 
 def convert_to_gdb(ws):
     ws_gdb = ws.replace(".geodatabase", ".gdb")
     ws_gdb_name = ws_gdb.split("\\")[-1]
-    dir_name = os.path.dirname(ws)
+    dir_name = dirname(ws)
     ic(ws_gdb, dir_name, ws_gdb_name)
     arcpy.management.CreateFileGDB(dir_name, ws_gdb_name, "CURRENT")
     print(f"Converting to {ws_gdb}")
@@ -496,8 +503,8 @@ def convert_to_gdb(ws):
     return converted_gdb
 
 def get_config(config_item):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(dir_path,'config.yaml')) as f:
+    here = pathlib.Path(__file__).parent
+    with open(here.joinpath("config.yaml")) as f:
         data = yaml.safe_load(f)
         return data.get(config_item)
 
@@ -514,21 +521,26 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
     arcpy.env.overwriteOutput = True
 
     data_ws = convert_to_gdb(data_ws)
-
-    cutter = os.path.join(data_ws, "Cut_Line" )
-    final_fc = get_config("output_fc_name")
+    cutter = join(data_ws, "Cut_Line" )
     input_id = get_config("idpk_field")
+
+    if select_date:
+        final_fc = f'{get_config("output_fc_name")}_{strip_non_alphanum(select_date)}'
+    
+    else:
+        final_fc = get_config("output_fc_name")
+
 
     weed_field_list = get_config("weed_field_list")
     other_field_list = get_config("other_field_list")
 
     fc_list = [
-        [os.path.join(data_ws, "Weed_Point"), weed_field_list],
-        [os.path.join(data_ws, "Weed_Line"), weed_field_list],
-        [os.path.join(data_ws, "No_Target_Point"), other_field_list],
-        [os.path.join(data_ws, "No_Target_Line"), other_field_list],
-        [os.path.join(data_ws, "No_Treatment_Point"), other_field_list],
-        [os.path.join(data_ws, "No_Treatment_Line"), other_field_list]
+        [join(data_ws, "Weed_Point"), weed_field_list],
+        [join(data_ws, "Weed_Line"), weed_field_list],
+        [join(data_ws, "No_Target_Point"), other_field_list],
+        [join(data_ws, "No_Target_Line"), other_field_list],
+        [join(data_ws, "No_Treatment_Point"), other_field_list],
+        [join(data_ws, "No_Treatment_Line"), other_field_list]
         ]
 
     grid_mem = make_mem_name(in_grid)
@@ -583,8 +595,8 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
 
                 slices, no_cross = cut(lines, polygons)
 
-                cut_fc = os.path.join(scratch_ws, fc_name + "_grid_cut_" + spp_)
-                no_cross_fc = os.path.join(scratch_ws, fc_name +"_no_cross_" +  spp_)
+                cut_fc = join(scratch_ws, fc_name + "_grid_cut_" + spp_)
+                no_cross_fc = join(scratch_ws, fc_name +"_no_cross_" +  spp_)
 
                 generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
                 generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
@@ -655,7 +667,7 @@ def stand_alone():
     global master_cross_list
     master_cross_list = []
     main_script = True
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BE666343FA89456585A067178081D0AF.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_931AFC4EE8FE4F50920839F44961ED47.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 
