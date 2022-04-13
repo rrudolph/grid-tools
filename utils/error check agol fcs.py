@@ -6,23 +6,27 @@ R. Rudolph
 
 import arcpy, sys
 from icecream import ic
+from os.path import join
 
-base_url = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/"
 
-weed_point 			= f"{base_url}0"
-weed_line 			= f"{base_url}1"
-bread_crumb_point 	= f"{base_url}2"
-bread_crumb_line 	= f"{base_url}3"
-no_target_point 	= f"{base_url}4"
-no_target_line 		= f"{base_url}5"
-no_treatment_point 	= f"{base_url}6"
-no_treatment_line 	= f"{base_url}7"
-cut_line 			= f"{base_url}8"
-assignment_point 	= f"{base_url}9"
-assignment_line 	= f"{base_url}10"
-correction_needed 	= f"{base_url}11"
-hidden_weed_point 	= f"{base_url}12"
-note 				= f"{base_url}13"
+path = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BD58C5BE2747440895DEFBCA936E689C.geodatabase"
+
+
+weed_point 				= join(path, "main.Weed_Point")
+weed_line 				= join(path, "main.Weed_Line")
+bread_crumb_point 		= join(path, "main.Bread_Crumb_Point")
+bread_crumb_line 		= join(path, "main.Bread_Crumb_Line")
+no_target_point			= join(path, "main.No_Target_Point")
+no_target_line			= join(path, "main.No_Target_Line")
+no_treatment_point		= join(path, "main.No_Treatment_Point")
+no_treatment_line		= join(path, "main.No_Treatment_Line")
+cut_line				= join(path, "main.Cut_Line")
+assignment_point		= join(path, "main.Assignment_Point")
+assignment_line			= join(path, "main.Assignment_Line")
+correction_needed		= join(path, "main.Correction_Needed")
+hidden_weed_point		= join(path, "main.Hidden_Weed_Point")
+note 					= join(path, "main.Note")
+
 
 all_fcs = [weed_point, 
 			weed_line, 

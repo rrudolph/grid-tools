@@ -4,8 +4,8 @@ from icecream import ic
 import sys
 
 # Don't edit the live service!  Use a .geodatabase sync copy to do big edits like this.
-# fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_931AFC4EE8FE4F50920839F44961ED47.geodatabase\main.Weed_Point"
-fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_931AFC4EE8FE4F50920839F44961ED47.geodatabase\main.Weed_Line"
+fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BD58C5BE2747440895DEFBCA936E689C.geodatabase\main.Weed_Point"
+# fc = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BD58C5BE2747440895DEFBCA936E689C.geodatabase\main.Weed_Line"
 
 
 # Now on OneDrive

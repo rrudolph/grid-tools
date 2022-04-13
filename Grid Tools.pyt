@@ -12,7 +12,7 @@ import re
 import itertools
 import yaml
 import pathlib
-from os.path import join
+from os.path import join, dirname, basename
 from collections import Counter
 from icecream import ic
 from timeit import default_timer as timer
@@ -667,7 +667,7 @@ def stand_alone():
     global master_cross_list
     master_cross_list = []
     main_script = True
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_931AFC4EE8FE4F50920839F44961ED47.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BD58C5BE2747440895DEFBCA936E689C.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
     scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
 
