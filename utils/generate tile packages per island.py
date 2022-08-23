@@ -3,7 +3,7 @@ import arcpy
 import re
 from os.path import join
 from time import time
-import humanfriendly
+from humanfriendly import format_timespan
   
   
 def timer_func(func):
@@ -13,7 +13,7 @@ def timer_func(func):
         t1 = time()
         result = func(*args, **kwargs)
         t2 = time()
-        print(f'Function {func.__name__!r} executed in {humanfriendly.format_timespan((t2-t1))}')
+        print(f'Function {func.__name__!r} executed in {format_timespan(t2-t1)}')
         return result
     return wrap_func
 
@@ -25,13 +25,12 @@ def strip_non_alphanum(string):
 def make_package(map_, name, extent):
     arcpy.CreateMapTilePackage_management(map_,
         "ONLINE",
-        join(base_dir, "Grid tile package", f"CHIS_Grid_Tile_Package_{strip_non_alphanum(name)}_25m_14.tpk"),
+        join(base_dir, "Grid tile package", f"CHIS_Grid_Tile_Package_{strip_non_alphanum(name)}_25m.tpk"),
         "MIXED",
         "14",
         package_type = "TPK",
         summary = f"CHIS grid tile package for {name}",
         extent = extent)
-
 
 
 arcpy.env.overwriteOutput = True
@@ -66,6 +65,5 @@ for name, extent in extent_dict.items():
             YMax: {extent.YMax}")
 
         make_package(map_, name, extent)
-
 
 print("Done")

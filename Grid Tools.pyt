@@ -11,11 +11,12 @@ import arcpy
 import re
 import itertools
 import yaml
-import pathlib
+from pathlib import Path
 from os.path import join, dirname, basename
 from collections import Counter
 from icecream import ic
 from timeit import default_timer as timer
+from humanfriendly import format_timespan
 try:
     from colorama import Fore, Back, Style, init
     init()
@@ -103,7 +104,7 @@ def elapsed_time(start,end):
     User will need to specify start and end times in the main script
     for each process needing timing. Use start = timer() and end = timer()
     '''
-    print("Elapsed time: " + str(round((end - start) / 60, 2)) + " min")
+    print(f"Elapsed time: {format_timespan(end - start)}")
 
 def print_(text, color="black"):
     # Make fancy colored output if using the terminal. 
@@ -360,7 +361,7 @@ def cut(lines, polygons):
             line_count = 0
             for line, line_id in lines:
                 if line.crosses(poly):
-                    print_("{} crosses {}".format(line_id, poly_id))
+                    # print_("{} crosses {}".format(line_id, poly_id))
                     crossed_list.append(poly_id)
                     master_cross_list.append(poly_id)
                     try:
@@ -370,7 +371,7 @@ def cut(lines, polygons):
                     except:
                         slices.insert(0, (poly, poly_id, "Error"))
                 else:
-                    print_("{} DOES NOT cross {}".format(line_id, poly_id))
+                    # print_("{} DOES NOT cross {}".format(line_id, poly_id))
                 line_count += 1
 
             if line_count >= len(lines) and poly_id not in crossed_list:
@@ -503,12 +504,12 @@ def convert_to_gdb(ws):
     return converted_gdb
 
 def get_config(config_item):
-    here = pathlib.Path(__file__).parent
+    here = Path(__file__).parent
     with open(here.joinpath("config.yaml")) as f:
         data = yaml.safe_load(f)
         return data.get(config_item)
 
-def run(data_ws, scratch_ws, in_grid, select_date = None):
+def run(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end = None, convert_gdb = True):
     '''
     Run the main program.
     data_ws: the workspace where all the data exists.
@@ -520,12 +521,19 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
     arcpy.env.workspace = scratch_ws
     arcpy.env.overwriteOutput = True
 
-    data_ws = convert_to_gdb(data_ws)
+    check_scratch_db()
+
+    if convert_gdb:
+        data_ws = convert_to_gdb(data_ws)
+    else:
+        data_ws = data_ws.replace(".geodatabase", ".gdb")
+        print_("Skipping gdb conversion", "yellow")
+
     cutter = join(data_ws, "Cut_Line" )
     input_id = get_config("idpk_field")
 
-    if select_date:
-        final_fc = f'{get_config("output_fc_name")}_{strip_non_alphanum(select_date)}'
+    if select_date_start:
+        final_fc = f'{get_config("output_fc_name")}_{strip_non_alphanum(select_date_start)}'
     
     else:
         final_fc = get_config("output_fc_name")
@@ -550,7 +558,6 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
 
     spatialref = arcpy.Describe(in_grid).spatialReference
 
-    check_scratch_db()
 
     for list_ in fc_list:
         fc = list_[0]
@@ -567,8 +574,8 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
                 temp_feature = f"{fc_name}_{spp_}_temp_spp_select"
                 out_select_grid_by_loc = f"Select_grid_{fc_name}_{spp_}"
                 
-                if select_date:
-                    exp = "{} = '{}' And Action_Date >= timestamp '{}'".format(field, spp, select_date)
+                if select_date_start and select_date_end:
+                    exp = "{} = '{}' And Action_Date >= timestamp '{}' And Action_Date <= timestamp '{}'".format(field, spp, select_date_start, select_date_end)
                 else:
                     exp = "{} = '{}'".format(field, spp)
 
@@ -659,6 +666,20 @@ def run(data_ws, scratch_ws, in_grid, select_date = None):
                     row[1] = count
                     cursor.updateRow(row)
 
+    print_("Combining finished applied ounces and gallons into one field")
+    arcpy.AddField_management(final_fc, "finished_Gallons_Total", "DOUBLE", None, None, None, "Finished Gallons Applied Total")
+    # The field user can enter in finished applied oz or gallons out of convenience. Combine them into a single field
+    # so totals can be calculated.
+    with arcpy.da.UpdateCursor(final_fc, ["finished_Gallons", "finished_Ounces", "finished_Gallons_Total"]) as cursor:
+        for row in cursor:
+            gal = row[0]
+            oz = row[1]
+            if gal:
+                row[2] = gal
+            if oz:
+                row[2] = oz * 0.0078125
+
+            cursor.updateRow(row)
 
     print_("Done!", "green")
 
@@ -667,15 +688,21 @@ def stand_alone():
     global master_cross_list
     master_cross_list = []
     main_script = True
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BD58C5BE2747440895DEFBCA936E689C.geodatabase"
+    convert_gdb = False
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_389AF591B9804119886C0AE074E316E7.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
-    scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
+    scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch_cies_2021.gdb"
 
-    # select_date = "2020-10-13"
-    select_date = None
+    if not arcpy.Exists(scratch_ws):
+        print_(f"Making scratch GeoDB: {scratch_ws}")
+        arcpy.management.CreateFileGDB(str(Path(scratch_ws).parent), str(Path(scratch_ws).name), "CURRENT")
+
+    select_date_start = "2021-01-01"
+    select_date_end = "2021-12-31"
+    # select_date = None
 
     start = timer()
-    run(data_ws, scratch_ws, in_grid, select_date)
+    run(data_ws, scratch_ws, in_grid, select_date_start, select_date_end, convert_gdb)
     end = timer()
     elapsed_time(start, end)
 if run_stand_alone:

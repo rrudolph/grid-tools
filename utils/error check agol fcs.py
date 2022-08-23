@@ -7,9 +7,10 @@ R. Rudolph
 import arcpy, sys
 from icecream import ic
 from os.path import join
+from tabulate import tabulate
 
 
-path = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Features_BD58C5BE2747440895DEFBCA936E689C.geodatabase"
+path = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_B6972405F82E49F9B4989C7AA8CB3E4F.geodatabase"
 
 
 weed_point 				= join(path, "main.Weed_Point")
@@ -105,7 +106,7 @@ def is_non_herbicide_mode(treatment_mode):
 def weed_error_check(fc, msg):
 	print(f"{'*'*10} Processing {msg}")
 	error_list = []
-	fields = ["OBJECTID", "finished_Gallons", "finished_Ounces", "formulation_Code", "weed_Target", "treatment_Mode", "percent_Target", "Action_Date"]
+	fields = ["OBJECTID", "finished_Gallons", "finished_Ounces", "formulation_Code", "weed_Target", "treatment_Mode", "percent_Target", "Action_Date", "applicator"]
 	with arcpy.da.SearchCursor(fc, fields) as cursor:
 		for row in cursor:
 			oid = row[0]
@@ -116,26 +117,35 @@ def weed_error_check(fc, msg):
 			treatment_Mode = row[5]
 			percent_Target = row[6]
 			action_date = row[7]
+			applicator = row[8]
 
 			error = f"Gallons: ({finished_Gallons}) Ounces: ({finished_Ounces})"
 			if finished_Gallons and finished_Ounces:
-				error_list.append((oid, f"Both have data. {error}"))
+				error_list.append((oid, action_date, applicator, f"Both have data. {error}"))
 			if not finished_Gallons and not finished_Ounces and not is_non_herbicide_mode(treatment_Mode):
-				error_list.append((oid, f"Neither have data. {error}"))
+				error_list.append((oid, action_date, applicator, f"Neither have data. {error}"))
 			if not formulation_Code and not is_non_herbicide_mode(treatment_Mode):
-				error_list.append((oid, f"Formulation code missing for treatment mode: {treatment_Mode}."))
-			if not weed_Target:
-				error_list.append((oid, "Species name missing."))
+				error_list.append((oid, action_date, applicator, f"Formulation code missing for treatment mode: {treatment_Mode}."))
+			if not treatment_Mode or treatment_Mode.isspace():
+				error_list.append((oid, action_date, applicator, f"Treatment mode missing: {treatment_Mode}."))
+			if not weed_Target or weed_Target.isspace():
+				error_list.append((oid, action_date, applicator, "Species name missing."))
 			if not percent_Target:
-				error_list.append((oid, "Percent cover missing."))
+				error_list.append((oid, action_date, applicator, "Percent cover missing."))
 			if not action_date:
-				error_list.append((oid, "UTC date missing."))
+				error_list.append((oid, action_date, applicator, "UTC date missing."))
 
 	if error_list:
 		print(f"Errors detected with weed data")
-		for oid, msg in error_list:
-			print(oid, msg)
-		print(f"OIDs: {set([oid for oid, msg in error_list])}")
+		error_dict = {}
+		error_dict["OIDs"] = map(lambda d: d[0], error_list)
+		error_dict["Date (UTC)"] = map(lambda d: d[1], error_list)
+		error_dict["Applicator"] = map(lambda d: d[2], error_list)
+		error_dict["Message"] = map(lambda d: d[3], error_list)
+		print(tabulate(error_dict, headers="keys")) #  tablefmt="grid"
+		# for oid, date_, msg in error_list:
+		# 	print(f"OID:{oid}, {date_}, {msg}")
+		print(f"OIDs: {set([oid for oid, date_, applicator, msg in error_list])}")
 	else:
 		print("No herbicide quantity errors detected.")
 
