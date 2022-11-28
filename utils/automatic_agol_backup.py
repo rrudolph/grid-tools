@@ -21,7 +21,9 @@ import arcpy
 import time
 import logging
 import os
-import zipfile
+from os.path import join
+from arcgis.gis import GIS
+import re
 
 # Optional debugger 
 try:
@@ -38,103 +40,48 @@ def plog(msg, msg_type="info"):
 	if msg_type == "error":
 		logger.error(msg)
 
-
-def zip_ws(path, zip):
-	'''Zip a file gdb, skip lock files'''
-	global zip_success
-	try:
-		files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-		for file in files:
-			if not file.endswith('.lock'):
-				print(f"Zipping {file}...")
-				try:
-					zip.write(os.path.join(path, file), arcname=file)
-
-				except Exception as e:
-					print(f"    Error adding {file}: {e}")
-
-		plog("Zip successful")
-		zip_success = True
-
-	except Exception as e:
-		plog(f"Zip failed: {e}")
-		zip_success = False
-
-def get_fc_count(fc):
-	''' Get the number of features. Optional but good to log '''
-	return arcpy.management.GetCount(fc)[0]
-
+def strip_non_alphanum(string):
+    return re.sub('[^0-9a-zA-Z]+', '_', string)
 
 
 # Vars
-archive_dir = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Archive"
-base_url = "https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/Features/FeatureServer/"
+backup_folder = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Archive"
 now = time.strftime('%Y%m%d%H%M%S')
 db_name = f"AGOL_Grid_DB_Backup_{now}"
-out_db = os.path.join(archive_dir, f"{db_name}.gdb")
+out_db = os.path.join(backup_folder, f"{db_name}.gdb")
 
-
-# Dictionary of AGOL fcs URLs
-fc_dict ={
-	"weed_point" 			: f"{base_url}0",
-	"weed_line" 			: f"{base_url}1",
-	"bread_crumb_point" 	: f"{base_url}2",
-	"bread_crumb_line" 		: f"{base_url}3",
-	"no_target_point" 		: f"{base_url}4",
-	"no_target_line" 		: f"{base_url}5",
-	"no_treatment_point" 	: f"{base_url}6",
-	"no_treatment_line" 	: f"{base_url}7",
-	"cut_line" 				: f"{base_url}8",
-	"assignment_point" 		: f"{base_url}9",
-	"assignment_line" 		: f"{base_url}10",
-	"correction_needed" 	: f"{base_url}11",
-	"hidden_weed_point" 	: f"{base_url}12",
-	"note" 					: f"{base_url}13"
-}
-
-
-# Create and configure logger
+## Set up logger
 LOG_FORMAT = "%(levelname)s %(asctime)s - line %(lineno)d - %(message)s"
-
-# If file doesn't exist, it will be created.  Append is default.
-logging.basicConfig(filename = os.path.join(archive_dir, "Grid_DB_backup.log"),
+logging.basicConfig(filename = join(backup_folder, "Grid_DB_backup.log"),
 	level = logging.INFO,
 	format = LOG_FORMAT,
 	datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger()
 
-def main():
-	''' Main script '''
-	try:
-		plog(f"Creating {db_name}")
-		arcpy.management.CreateFileGDB(archive_dir, db_name, "CURRENT")
-		
-		for fc_name, url in fc_dict.items():
-			feat_count = get_fc_count(url)
-			arcpy.conversion.FeatureClassToFeatureClass(url, 
-				out_db, 
-				fc_name,
-				None, None, None)
-			plog(f"Success downloading {fc_name}. Feature count: {feat_count}")
+plog(f"Connecting to AGOL")
+gis = GIS("pro")
+## Vars for tool
+item_id = '29c3f9e4367a49a0bf770b3e0cc65082'
+export_type = "File Geodatabase"
 
-		
-	except Exception as e:
-		plog(f"An error occurred with {fc_name}. Message: {e}", "error")
+data_item = gis.content.get(item_id)
+data_title = strip_non_alphanum(data_item['title'])
+plog(f"[+] Processing {data_title}")
+temp_file = time.strftime(f"{data_title}_backup_%Y%m%d_%H%M")
+plog(f"....Generatring temporary {export_type}: {temp_file}")
+data_item.export(temp_file, export_type, parameters=None, wait=True)
+exported_temp = gis.content.search(temp_file, item_type=export_type)
+# ic(exported_file)
+exported_file = gis.content.get(exported_temp[0].itemid)
+username = exported_file['owner']
+export_name = exported_file['name']
+new_export_name = export_name.replace('.zip', f'_{username}.zip')
+# ic(exported_file)
+plog(f"....Downloading as {export_type}")
+exported_file.download(save_path=backup_folder)
+os.rename(join(backup_folder, export_name), join(backup_folder, new_export_name))
+plog(f"....Removing {export_type} backup online") # No need to keep. Saves AGOL user account space. 
+exported_file.delete()
+plog("....Download complete")
 
-
-	try:
-		out_zip = out_db + ".zip"
-		plog(f"Generating zip file: {out_zip}")
-		with zipfile.ZipFile(out_zip, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-			zip_ws(out_db, zip_file)
-
-		if zip_success:
-			plog(f"Deleting file gdb... {out_db}")
-			arcpy.Delete_management(out_db)
-
-	except Exception as e:
-		plog(f"Error making zip file. Message: {e}", "error")
-
-
-if __name__ == '__main__':
-	main()
+plog("Backup complete.")

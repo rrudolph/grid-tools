@@ -5,10 +5,11 @@ from pathlib import Path
 
 
 '''
-'All_Features_Merge_2022_01_01_fire_only selection cut stump'
-'All_Features_Merge_2022_01_01_fire_only selection grasses'
-'All_Features_Merge_2022_01_01_fire_only selection OLEU'
-'All_Features_Merge_2022_01_01_fire_only by species'
+'Cut Stump 2022'
+'Grasses 2022'
+'OLEU 2022'
+'Not Treated or Not Found'
+'Fire Perim by Species 2022'
 'Features'
 'Weed_Point'
 'Weed_Line'
@@ -24,11 +25,11 @@ from pathlib import Path
 'Correction_Needed'
 'Hidden_Weed_Point'
 'Note'
-'All_Features_Merge_2022_01_01_fire_only foliar backpack'
+'Fire Perim Foliar 2022'
 'Merge_combined'
-'All_Features_Merge_2021_01_01_fire_only'
-'All_Features_Merge_2022_01_01_fire_only'
-'Scorpion_fire_general_polygon'
+'Fire Perim 2021'
+'Fire Perim 2022'
+'Scorpion Fire Perim'
 'Trails'
 'Roads'
 'NCI_Grid_25m'
@@ -39,13 +40,13 @@ from pathlib import Path
 always_on = ['Scorpion_fire_general_polygon','Trails','Roads','World Imagery']
 
 scenario_dict = {
-'2022 Season CIES Invasive Plant Treatments' 					:always_on + ['All_Features_Merge_2022_01_01_fire_only' ],
-'2021 and 2022 Season CIES Invasive Plant Treatments' 			:always_on + ['All_Features_Merge_2022_01_01_fire_only', 'All_Features_Merge_2021_01_01_fire_only' ],
-'2022 Season CIES Cut Stump Invasive Plant Treatments' 			:always_on + ['All_Features_Merge_2022_01_01_fire_only selection cut stump'],
-'2022 Season CIES Foliar Backpack Invasive Plant Treatments' 	:always_on + ['All_Features_Merge_2022_01_01_fire_only foliar backpack'],
-'2022 Season CIES Invasive Plant Treatments by Species' 		:always_on + ['2022 fire only by species'],
-'2022 Season CIES Invasive Olive Treatments' 					:always_on + ['All_Features_Merge_2022_01_01_fire_only selection OLEU'],
-'2022 Season CIES Invasive Grass Species Treatments' 			:always_on + ['All_Features_Merge_2022_01_01_fire_only selection grasses'],
+'2022 Season CIES Invasive Plant Treatments' 					:always_on + ['Fire Perim 2022' ],
+'2021 and 2022 Season CIES Invasive Plant Treatments' 			:always_on + ['Fire Perim 2022', 'Fire Perim 2021' ],
+'2022 Season CIES Cut Stump Invasive Plant Treatments' 			:always_on + ['Cut Stump 2022'],
+'2022 Season CIES Foliar Backpack Invasive Plant Treatments' 	:always_on + ['Fire Perim Foliar 2022'],
+'2022 Season CIES Invasive Plant Treatments by Species' 		:always_on + ['Fire Perim by Species 2022','Not Treated or Not Found'],
+'2022 Season CIES Invasive Olive Treatments' 					:always_on + ['OLEU 2022'],
+'2022 Season CIES Invasive Grass Species Treatments' 			:always_on + ['Grasses 2022'],
 
 }
 
@@ -59,7 +60,7 @@ leg = lyt.listElements('LEGEND_ELEMENT')[0]
 
 lyrs = map_.listLayers()
 
-# #######if needed, make a big list of all the layers to pick from
+#######if needed, make a big list of all the layers to pick from
 # for lyr in lyrs:
 # 	print(f"'{lyr.name}'")
 

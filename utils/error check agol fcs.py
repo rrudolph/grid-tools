@@ -4,13 +4,15 @@ Updated 6/2/2021
 R. Rudolph
 '''
 
-import arcpy, sys
+import arcpy
+import sys
 from icecream import ic
 from os.path import join
 from tabulate import tabulate
+from dateutil import tz
 
-
-path = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_B6972405F82E49F9B4989C7AA8CB3E4F.geodatabase"
+# Use the local synced copy downloaded from AGOL, not the actual feature service. 
+path = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_B31FB723F81D40A89B73126E7CEC59BB.geodatabase"
 
 
 weed_point 				= join(path, "main.Weed_Point")
@@ -45,21 +47,31 @@ all_fcs = [weed_point,
 			note 
 			]
 
+def convert_utc_to_local(utc_time):
+	from_zone = tz.tzutc()
+	to_zone = tz.tzlocal()
+	utc = utc_time.replace(tzinfo=from_zone)
+	local = utc.astimezone(to_zone)
+	local_str = local.strftime('%b %d, %Y %r')
+	return local_str
+
+
 def get_unique_values(fc, field):
     # Returns unique values of a field into a sorted list
     with arcpy.da.SearchCursor(fc, [field]) as cursor:
         return {row[0] for row in cursor}
 
-def generate_local_time(fc_list):
-	for fc in fc_list:
-		print(f"Fixing time for {fc}")
-		arcpy.management.ConvertTimeZone(fc,
-		"Action_Date",
-		"UTC",
-		"Action_Date_Local",
-		"Pacific_Standard_Time",
-		"INPUT_NOT_ADJUSTED_FOR_DST",
-		"OUTPUT_ADJUSTED_FOR_DST")
+## Not using this anymore. Generating local time on the fly to prevent writing to the attribute table. 
+# def generate_local_time(fc_list):
+# 	for fc in fc_list:
+# 		print(f"Fixing time for {fc}")
+# 		arcpy.management.ConvertTimeZone(fc,
+# 		"Action_Date",
+# 		"UTC",
+# 		"Action_Date_Local",
+# 		"Pacific_Standard_Time",
+# 		"INPUT_NOT_ADJUSTED_FOR_DST",
+# 		"OUTPUT_ADJUSTED_FOR_DST")
 
 def is_non_herbicide_mode(treatment_mode):
 	'''Determine if the treatment mode is non-herbicide. These treatment modes
@@ -105,7 +117,7 @@ def is_non_herbicide_mode(treatment_mode):
 
 def weed_error_check(fc, msg):
 	print(f"{'*'*10} Processing {msg}")
-	error_list = []
+	error_list = [] # The error list is a list of four items in a tuple appended using the below search cursor and if statements. 
 	fields = ["OBJECTID", "finished_Gallons", "finished_Ounces", "formulation_Code", "weed_Target", "treatment_Mode", "percent_Target", "Action_Date", "applicator"]
 	with arcpy.da.SearchCursor(fc, fields) as cursor:
 		for row in cursor:
@@ -121,9 +133,9 @@ def weed_error_check(fc, msg):
 
 			error = f"Gallons: ({finished_Gallons}) Ounces: ({finished_Ounces})"
 			if finished_Gallons and finished_Ounces:
-				error_list.append((oid, action_date, applicator, f"Both have data. {error}"))
+				error_list.append((oid, action_date, applicator, f"Both herbicde fields have data. {error}"))
 			if not finished_Gallons and not finished_Ounces and not is_non_herbicide_mode(treatment_Mode):
-				error_list.append((oid, action_date, applicator, f"Neither have data. {error}"))
+				error_list.append((oid, action_date, applicator, f"Neither herbicde fields have data. {error}"))
 			if not formulation_Code and not is_non_herbicide_mode(treatment_Mode):
 				error_list.append((oid, action_date, applicator, f"Formulation code missing for treatment mode: {treatment_Mode}."))
 			if not treatment_Mode or treatment_Mode.isspace():
@@ -137,14 +149,13 @@ def weed_error_check(fc, msg):
 
 	if error_list:
 		print(f"Errors detected with weed data")
-		error_dict = {}
+		error_dict = {} # Make a dictionary by mapping over the errors list and accessing each of the items in the tuples.
 		error_dict["OIDs"] = map(lambda d: d[0], error_list)
 		error_dict["Date (UTC)"] = map(lambda d: d[1], error_list)
+		error_dict["Date (Local)"] = map(lambda d: convert_utc_to_local(d[1]), error_list)
 		error_dict["Applicator"] = map(lambda d: d[2], error_list)
 		error_dict["Message"] = map(lambda d: d[3], error_list)
-		print(tabulate(error_dict, headers="keys")) #  tablefmt="grid"
-		# for oid, date_, msg in error_list:
-		# 	print(f"OID:{oid}, {date_}, {msg}")
+		print(tabulate(error_dict, headers="keys")) 
 		print(f"OIDs: {set([oid for oid, date_, applicator, msg in error_list])}")
 	else:
 		print("No herbicide quantity errors detected.")
@@ -161,11 +172,11 @@ def no_t_check(fc, msg):
 			spp = row[3]
 			# ic(action_date, staff, spp)
 
-			if action_date is None or action_date == ' ':
+			if action_date is None or action_date == " ":
 				error_list.append((oid, "missing action date."))
-			if staff is None or staff == ' ':
+			if staff is None or staff.isspace():
 				error_list.append((oid, "missing staff."))
-			if spp is None or spp == ' ':
+			if spp is None or spp.isspace():
 				error_list.append((oid, "missing species."))
 	if error_list:
 		print("Errors detected 'T' features")
@@ -176,7 +187,7 @@ def no_t_check(fc, msg):
 		print("No 'T' errors found")
 
 def cut_line_error_check(fc, msg):
-	print(f"{'*'*10} Processing {msg}")
+	print(f"{'*'*20} Processing {msg} {'*'*20} ")
 	error_list = []
 	fields = ["OBJECTID", "Action_Date", "Staff", "Species"]
 	with arcpy.da.SearchCursor(fc, fields) as cursor:
@@ -200,8 +211,6 @@ def cut_line_error_check(fc, msg):
 		print("No cut line errors found")
 
 
-
-
 weed_error_check(weed_point, "weed_point")
 weed_error_check(weed_line, "weed_line")
 cut_line_error_check(cut_line, "cut_line")
@@ -210,4 +219,3 @@ no_t_check(no_target_line, "no_target_line")
 no_t_check(no_treatment_point, "no_treatment_point")
 no_t_check(no_treatment_line, "no_treatment_line")
 
-# generate_local_time(all_fcs)

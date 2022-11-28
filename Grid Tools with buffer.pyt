@@ -17,11 +17,28 @@ from collections import Counter
 from icecream import ic
 from timeit import default_timer as timer
 from humanfriendly import format_timespan
+import logging
+import time
 try:
     from colorama import Fore, Back, Style, init
     init()
 except:
     pass
+
+
+# Create and configure logger
+LOG_FORMAT = "%(levelname)s %(asctime)s - line %(lineno)d - %(message)s"
+
+now = time.localtime() # get struct_time
+year, month, day, hour, minute = now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min
+
+# If file doesn't exist, it will be created.  Append is default.
+logging.basicConfig(filename =Path(__file__).parent / f'grid_processing_{year}{month}{day}{hour}{minute}.log',
+    level = logging.DEBUG,
+    format = LOG_FORMAT)
+
+logger = logging.getLogger()
+
 
 # TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
 
@@ -108,7 +125,7 @@ def elapsed_time(start,end):
 
 def print_(text, color="black"):
     # Make fancy colored output if using the terminal. 
-
+    logger.info(text)
     if main_script:
         if color == "red":
             try:
@@ -144,6 +161,33 @@ def print_(text, color="black"):
             
     else:
         arcpy.AddMessage(text)
+
+
+def add_fc_name(fc):
+    base_name = get_base_name(fc)
+    print_("Adding FILESOURCE field and calculating")
+    arcpy.AddField_management(fc, "FILESOURCE", "text", "", "", "50")
+    arcpy.CalculateField_management(fc, "FILESOURCE", f"'{base_name}'", "PYTHON_9.3", "")
+
+
+def get_buffered_area(fc):
+    '''
+    Inputs a featureclass that is a buffered weed line.
+    Returns the total area buffered in acres. 
+    Used for the part of the script that buffered weed lines along roads and trails.  Data needs to be proportional across the
+    grid cells that is intersected by the buffered area for a given ween line treatment. This total buffered area is part of the
+    calculation to do that proportional herbicide treatment value. 
+    '''
+    arcpy.management.CalculateGeometryAttributes(fc, "gross_Acres AREA", '', "ACRES", get_config("out_coor_system"), "SAME_AS_INPUT")
+    total_area = []
+    fields = ['gross_Acres', 'Action_Type']
+    with arcpy.da.SearchCursor(fc, fields) as cursor:
+        for row in cursor:
+            print(f'{row[0]}, {row[1]}')
+            if row[1] in ['Weed_Line']:
+                print("Appending to total area list")
+                total_area.append(row[0])
+    return sum(total_area)
 
 def get_base_name(fc):
     # Return the basename of an fc rather than the entire path.
@@ -328,6 +372,8 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
         match_option="INTERSECT", 
         search_radius="", 
         distance_field_name="")
+
+    add_fc_name(out_join)
 
     # Add the name of the feature to the attribute table. This will allow the user to see the source of 
     # the feature and its type.
@@ -570,12 +616,12 @@ def run(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end 
             for spp in species_list:
                 # Strip any weird characters from the name
                 spp_ = re.sub('[^0-9a-zA-Z]+', '_', spp)
-
+                non_buffered_line_exists = False
+                buffered_line_executed = False
                 temp_feature = f"{fc_name}_{spp_}_temp_spp_select"
-                out_select_grid_by_loc = f"Select_grid_{fc_name}_{spp_}"
                 
                 if select_date_start and select_date_end:
-                    exp = "{} = '{}' And Action_Date >= timestamp '{}' And Action_Date <= timestamp '{}'".format(field, spp, select_date_start, select_date_end)
+                    exp = f"{field} = '{spp}' And Action_Date >= timestamp '{select_date_start} 00:00:00' And Action_Date <= timestamp '{select_date_end} 00:00:00'"
                 else:
                     exp = "{} = '{}'".format(field, spp)
 
@@ -584,37 +630,145 @@ def run(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end 
                     out_feature_class=temp_feature, 
                     where_clause=exp)
 
-                print_("Selecting by location for {}".format(temp_feature))
-                arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', temp_feature)
+                if fc_name == "Weed_Line":
+                    # We need to handle weed lines that have buffer values differently
+                    weed_line_to_buffer = temp_feature + "_to_buffer"
+                    weed_line_not_buffer = temp_feature + "_not_buffer"
 
-                print_("Copying {}".format(fc_name))
-                arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
+                    # Get lines needing buffer
+                    print_("Selecting buffer weed lines")
+                    arcpy.analysis.Select(temp_feature,
+                        weed_line_to_buffer,
+                        "meter_Buffer_Distance > 0")
+                    
+                    # Get all other non buffer lines
+                    print_("Selecting non buffer weed lines")
+                    arcpy.analysis.Select(temp_feature,
+                        weed_line_not_buffer,
+                        "meter_Buffer_Distance < 1")
 
-                cutter_select = "Cutter_{}".format(spp_)
+                    weed_line_to_buffer_count = int(arcpy.GetCount_management(weed_line_to_buffer)[0])
+                    weed_line_not_buffer_count = int(arcpy.GetCount_management(weed_line_not_buffer)[0])
 
-                print_("Selecting cut line to match species {}".format(cutter_select), "magenta")
-                arcpy.Select_analysis(in_features=cutter,
-                    out_feature_class=cutter_select, 
-                    where_clause="Species = '{}'".format(spp))
+                    print_(f"Weed lines to buffer: {weed_line_to_buffer_count} and not buffer: {weed_line_not_buffer_count}")
 
-                lines = get_geom(cutter_select, input_id)
-                polygons = get_geom(out_select_grid_by_loc, input_id)
+                    if weed_line_to_buffer_count > 0:
+                        with arcpy.da.SearchCursor(weed_line_to_buffer, ["OBJECTID", "Action_Date", "applicator", "weed_Target"] ) as cursor:
+                            for row in cursor:
+                                oid = row[0]  
+                                Action_Date = row[1]
+                                applicator = row[2]
+                                weed_Target = row[3]
 
-                slices, no_cross = cut(lines, polygons)
+                                out_select = f"{weed_line_to_buffer}_{oid}"
+                                out_select_buffer = f"{weed_line_to_buffer}_{oid}_buffer"
+                                out_select_union = f"{weed_line_to_buffer}_{oid}_union"
 
-                cut_fc = join(scratch_ws, fc_name + "_grid_cut_" + spp_)
-                no_cross_fc = join(scratch_ws, fc_name +"_no_cross_" +  spp_)
+                                out_select_grid_by_loc = f"Select_grid_{fc_name}_{spp_}_{oid}"
 
-                generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
-                generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
+                                print_(f"Selecting, buffering, unioning {out_select}")
+                                arcpy.analysis.Select(weed_line_to_buffer,
+                                    out_select,
+                                    f"OBJECTID = {oid}")
+
+                                print_("Selecting by location for {}".format(out_select))
+                                arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', out_select)
+
+                                print_("Copying {}".format(fc_name))
+                                arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
+
+                                arcpy.analysis.Buffer(out_select,
+                                    out_select_buffer,
+                                    "meter_Buffer_Distance", "FULL", "FLAT", "NONE", None, "PLANAR")
+                                add_field(out_select_buffer, "Action_Type", 50, "Action Type")
+                                print_("Calculating field")
+                                arcpy.CalculateField_management(out_select_buffer, "Action_Type", f"'Weed_Line'", "PYTHON_9.3", "")
+
+                                arcpy.analysis.Union([out_select_grid_by_loc, out_select_buffer], 
+                                    out_select_union,
+                                    "ALL", None, "GAPS")
+
+                                print_("Updating union data")
+                                with arcpy.da.UpdateCursor(out_select_union, ["Action_Date", "applicator", "weed_Target","Action_Type" ] ) as upcursor:
+                                    for row in upcursor:
+                                        row[0] = Action_Date
+                                        row[1] = applicator
+                                        row[2] = weed_Target
+                                        if not row[3]:
+                                            row[3] = "No_Target_Line_Buffer"
+                                        upcursor.updateRow(row)
+
+                                buffered_area = get_buffered_area(out_select_union)
+
+                                print_("Adding original_finished_ounces/gallons fields")
+                                arcpy.management.AddField(out_select_union, "original_finished_ounces", "DOUBLE", None, None, None, "Original Finished Ounces Applied", "NULLABLE", "NON_REQUIRED", '')
+                                arcpy.management.AddField(out_select_union, "original_finished_gallons", "DOUBLE", None, None, None, "Original Finished Ounces Applied", "NULLABLE", "NON_REQUIRED", '')
+
+                                #                                                  0                     1                       2                    3                          4               5
+                                with arcpy.da.UpdateCursor(out_select_union, ['finished_Ounces', 'finished_Gallons', 'original_finished_ounces', 'original_finished_gallons', 'Action_Type', 'gross_Acres']) as cursor:
+                                    for row in cursor:
+                                        if row[4] in ['Weed_Line']:
+                                            if row[0]:
+                                                row[2] = row[0] # Keep a record of the original ounces value
+                                                row[0] = (row[5] / buffered_area) * row[0] # get ounces proportional to the area and total applied for the line
+                                            if row[1]:
+                                                row[3] = row[1] # Keep a record of the original gallons value
+                                                row[1] = (row[5] / buffered_area) * row[1]
+                                            cursor.updateRow(row)
+
+                        add_fc_name(out_select_union)
+                        print_(f"Setting buffer line to true")
+                        buffered_line_executed = True
+
+                    if weed_line_not_buffer_count > 0:
+                        print_(f"Setting not buffered line to true")
+                        non_buffered_line_exists = True
 
 
+                if fc_name != "Weed_Line" or non_buffered_line_exists:
+
+                    if non_buffered_line_exists:
+                        print_("Not buffered exists")
+                        print_(weed_line_not_buffer)
+                        print_(temp_feature)
+                        temp_feature = weed_line_not_buffer
+                        print_(temp_feature)
+
+                    out_select_grid_by_loc = f"Select_grid_{fc_name}_{spp_}"
+
+                    print_("Selecting by location for {}".format(temp_feature))
+                    arcpy.SelectLayerByLocation_management(grid_mem, 'intersect', temp_feature)
+
+                    print_("Copying {}".format(fc_name))
+                    arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
+
+                    cutter_select = "Cutter_{}".format(spp_)
+
+                    print_("Selecting cut line to match species {}".format(cutter_select), "magenta")
+                    arcpy.Select_analysis(in_features=cutter,
+                        out_feature_class=cutter_select, 
+                        where_clause="Species = '{}'".format(spp))
+
+                    lines = get_geom(cutter_select, input_id)
+                    polygons = get_geom(out_select_grid_by_loc, input_id)
+
+                    slices, no_cross = cut(lines, polygons)
+
+                    cut_fc = join(scratch_ws, fc_name + "_grid_cut_" + spp_)
+                    no_cross_fc = join(scratch_ws, fc_name +"_no_cross_" +  spp_)
+
+                    generate_output_grid(cut_fc, slices, temp_feature, spatialref, spp)
+                    generate_output_grid(no_cross_fc, no_cross, temp_feature, spatialref, spp)
+
+                if buffered_line_executed:
+                    print_("Yes buffered line executed")
+                    pass
 
     print_("Removing grid_mem var")
     arcpy.Delete_management(grid_mem)
 
     print_("Merging all joined features", "green")
-    fcs = arcpy.ListFeatureClasses("*_joined")
+    fcs = arcpy.ListFeatureClasses("*_joined") + arcpy.ListFeatureClasses("*_union")
 
     print_("Merging", "green")
     arcpy.Merge_management(fcs, final_fc)
@@ -628,7 +782,7 @@ def run(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end 
                 calc_error_field(final_fc, msg, e2[0])
 
     print_("Deleting unneeded fields", "red")
-    del_fields = other_field_list + ["Join_Count", "TARGET_FID"]
+    del_fields = other_field_list + ["Join_Count", "TARGET_FID"] + [f.name for f in arcpy.ListFields(final_fc) if f.name.startswith("FID")] 
     delete_fields(final_fc, del_fields)
 
     print_("Calculating gross infested acres")
@@ -689,18 +843,14 @@ def stand_alone():
     master_cross_list = []
     main_script = True
     convert_gdb = True
-    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_7A3E4482DF404346874E7D5043E1F523.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_44945C5A4784422EA1747C274C86C556.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
-    scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch_annie_buffer.gdb"
+    scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch_buffer_logic_test.gdb"
 
     if not arcpy.Exists(scratch_ws):
         print_(f"Making scratch GeoDB: {scratch_ws}")
         arcpy.management.CreateFileGDB(str(Path(scratch_ws).parent), str(Path(scratch_ws).name), "CURRENT")
 
-    # select_date_start = "2021-01-01"
-    # select_date_end = "2021-12-31"
-
-    # Annie request
     select_date_start = "2021-10-01"
     select_date_end = "2022-09-30"
     # select_date = None

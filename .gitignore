@@ -1,3 +1,4 @@
 *.xml
 archive
 __pycache__
+*.log
