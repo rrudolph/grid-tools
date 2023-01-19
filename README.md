@@ -27,4 +27,4 @@ Edit variables at the bottom of the script before running.
 `scratch_ws` is the scratch workspace that generates temporary data and the final output merged grid product.  Most of the data in here is for debugging purposes or to inspect output as the script iterates over each species.  The final 'All_Features_Merge' product is typically where the herbiced and acres totals are calculated by the GIS specialist. 
 
 
-
+The `config.yaml` yaml file typically does not need editing.  It's where I stored some field names, projection strings, and other data that I didn't want to clutter up the script with. 
