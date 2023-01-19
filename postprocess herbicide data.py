@@ -1,3 +1,14 @@
+'''
+Mandatory script for adding all the back-end herbicide data to the AGOL service.  You must make a an offline copy of the data
+in Pro and point this script to that .geodatabase file, run, make sure it looks good, then sync the data back to AGOL. 
+the xlsx path must be the valid, most up-to-date version of the formulation codes in order for this script to provide
+accurate data about the herbicide trade names and concentration quantities. 
+
+
+R. Rudolph
+1/19/2023
+'''
+
 import  arcpy
 import pandas as pd
 from icecream import ic
@@ -44,6 +55,7 @@ field_list = [
 
 ## Functions
 def get_unique_fc(fc, field):
+	'''Accepts a featureclass and a field name. Returns only the unique values in that field.'''
 	with arcpy.da.SearchCursor(fc, [field]) as cursor:
 		return {row[0] for row in cursor}
 

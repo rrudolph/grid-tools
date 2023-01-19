@@ -1,9 +1,11 @@
 '''
-Arcpy python toolbox (and standalone script) for use in automating
-Wildlands Conservation Science invasives species data collection system.
+Script for automating Wildlands Conservation Science invasives species data collection system.
+
+Update Jan 2023. I eliminated all the python toolbox functionality because I didn't use it and it added 
+unecessary complications and code. Sometimes it would accidentally run and cause Pro to crash.
 
 Author: Rocky Rudolph, GISP, rocky_rudolph@nps.gov
-Date 5/20/2020
+Date 1/19/2023
 '''
 
 
@@ -40,80 +42,7 @@ logging.basicConfig(filename =Path(__file__).parent / f'grid_processing_{year}{m
 logger = logging.getLogger()
 
 
-# TODO: Add buffer for weed_line, by direction, then spatial interesect the grid 
-
-run_stand_alone = True
-
-class Toolbox(object):
-    def __init__(self):
-        """Define the toolbox (the name of the toolbox is the name of the
-        .pyt file)."""
-        self.label = "Toolbox"
-        self.alias = ""
-
-        # List of tool classes associated with this toolbox
-        self.tools = [CutAndMergeCells]
-
-
-class CutAndMergeCells(object):
-    def __init__(self):
-        """Define the tool (tool name is the name of the class)."""
-        self.label = "CutAndMergeCells"
-        self.description = ""
-        self.canRunInBackground = False
-
-    def getParameterInfo(self):
-        """Define parameter definitions"""
-        param0 = arcpy.Parameter(
-        displayName="Data Workspace",
-        name="data_ws",
-        datatype="GPString",
-        parameterType="Required",
-        direction="Input")
-
-        param1 = arcpy.Parameter(
-        displayName="Scratch Workspace",
-        name="ws",
-        datatype="GPString",
-        parameterType="Required",
-        direction="Input")
-
-        param2 = arcpy.Parameter(
-        displayName="Grid",
-        name="in_grid",
-        datatype="GPString",
-        parameterType="Required",
-        direction="Input")
-
-
-        params = [param0, param1, param2]
-        return params
-
-    def isLicensed(self):
-        """Set whether tool is licensed to execute."""
-        return True
-
-    def updateParameters(self, parameters):
-        """Modify the values and properties of parameters before internal
-        validation is performed.  This method is called whenever a parameter
-        has been changed."""
-        return
-
-    def updateMessages(self, parameters):
-        """Modify the messages created by internal validation for each tool
-        parameter.  This method is called after internal validation."""
-        return
-
-    def execute(self, parameters, messages):
-        """The source code of the tool."""
-        data_ws = parameters[0].valueAsText
-        scratch_ws = parameters[1].valueAsText
-        in_grid  = parameters[2].valueAsText
-        global main_script
-        main_script = False
-        run(data_ws, scratch_ws, in_grid)
-
-        return
+# Define custom functions
 
 def elapsed_time(start,end):
     '''
@@ -126,43 +55,39 @@ def elapsed_time(start,end):
 def print_(text, color="black"):
     # Make fancy colored output if using the terminal. 
     logger.info(text)
-    if main_script:
-        if color == "red":
-            try:
-                print(Back.RED + text+ Style.RESET_ALL)
-            except:
-                print(text)
-        elif color == "yellow":
-            try:
-                print(Fore.BLACK + Back.YELLOW + text + Style.RESET_ALL)
-            except:
-                print(text)
 
-        elif color == "green":
-            try:
-                print(Fore.BLACK + Back.GREEN + text + Style.RESET_ALL)
-            except:
-                print(text)
-
-        elif color == "magenta":
-            try:
-                print(Fore.WHITE + Back.MAGENTA + Style.BRIGHT + text + Style.RESET_ALL)
-            except:
-                print(text)
-
-        elif color == "cyan":
-            try:
-                print(Fore.WHITE + Back.CYAN + Style.BRIGHT + text + Style.RESET_ALL)
-            except:
-                print(text)
-
-        else:
+    if color == "red":
+        try:
+            print(Back.RED + text+ Style.RESET_ALL)
+        except:
             print(text)
-            
+    elif color == "yellow":
+        try:
+            print(Fore.BLACK + Back.YELLOW + text + Style.RESET_ALL)
+        except:
+            print(text)
+
+    elif color == "green":
+        try:
+            print(Fore.BLACK + Back.GREEN + text + Style.RESET_ALL)
+        except:
+            print(text)
+
+    elif color == "magenta":
+        try:
+            print(Fore.WHITE + Back.MAGENTA + Style.BRIGHT + text + Style.RESET_ALL)
+        except:
+            print(text)
+
+    elif color == "cyan":
+        try:
+            print(Fore.WHITE + Back.CYAN + Style.BRIGHT + text + Style.RESET_ALL)
+        except:
+            print(text)
+
     else:
-        arcpy.AddMessage(text)
-
-
+        print(text)
+            
 def add_fc_name(fc):
     base_name = get_base_name(fc)
     print_("Adding FILESOURCE field and calculating")
@@ -555,7 +480,7 @@ def get_config(config_item):
         data = yaml.safe_load(f)
         return data.get(config_item)
 
-def run(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end = None, convert_gdb = True):
+def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end = None, convert_gdb = True):
     '''
     Run the main program.
     data_ws: the workspace where all the data exists.
@@ -837,8 +762,8 @@ def run(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end 
 
     print_("Done!", "green")
 
-def stand_alone():
-    global main_script
+if __name__ == '__main__':
+
     global master_cross_list
     master_cross_list = []
     main_script = True
@@ -856,9 +781,7 @@ def stand_alone():
     # select_date = None
 
     start = timer()
-    run(data_ws, scratch_ws, in_grid, select_date_start, select_date_end, convert_gdb)
+    main(data_ws, scratch_ws, in_grid, select_date_start, select_date_end, convert_gdb)
     end = timer()
     elapsed_time(start, end)
     
-if run_stand_alone:
-    stand_alone()
