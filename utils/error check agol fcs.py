@@ -12,7 +12,7 @@ from tabulate import tabulate
 from dateutil import tz
 
 # Use the local synced copy downloaded from AGOL, not the actual feature service. 
-path = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_B31FB723F81D40A89B73126E7CEC59BB.geodatabase"
+path = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_934F9A1B41764DBEA3936EA38C261124.geodatabase"
 
 
 weed_point 				= join(path, "main.Weed_Point")
@@ -150,9 +150,9 @@ def weed_error_check(fc, msg):
 	if error_list:
 		print(f"Errors detected with weed data")
 		error_dict = {} # Make a dictionary by mapping over the errors list and accessing each of the items in the tuples.
-		error_dict["OIDs"] = map(lambda d: d[0], error_list)
-		error_dict["Date (UTC)"] = map(lambda d: d[1], error_list)
-		error_dict["Date (Local)"] = map(lambda d: convert_utc_to_local(d[1]), error_list)
+		error_dict["OIDs"] 			= map(lambda d: d[0], error_list)
+		error_dict["Date (UTC)"] 	= map(lambda d: d[1], error_list)
+		error_dict["Date (Local)"] 	= map(lambda d: convert_utc_to_local(d[1]), error_list)
 		error_dict["Applicator"] = map(lambda d: d[2], error_list)
 		error_dict["Message"] = map(lambda d: d[3], error_list)
 		print(tabulate(error_dict, headers="keys")) 

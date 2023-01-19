@@ -51,8 +51,8 @@ scenario_dict = {
 }
 
 
-outFolder = Path(r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Reporting")
-aprx = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\CHIS Invasives Pro.aprx"
+outFolder = Path(r"C:\GIS\Projects\CHIS Invasives\Reporting")
+aprx = r"C:\GIS\Projects\CHIS Invasives\CHIS Invasives Pro.aprx"
 p = arcpy.mp.ArcGISProject(aprx)
 lyt = p.listLayouts('Invasives Reporting FY22 CIES')[0]
 map_ = p.listMaps('Invasvies Reporting FY22 CIES SCI')[0]

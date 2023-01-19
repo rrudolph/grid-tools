@@ -16,7 +16,7 @@ tz = pytz.timezone('US/Pacific')
 
 
 ## To do all the fcs
-ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Feature Downloads\Features_09AB5B7F24494A77884651D4489996B9.geodatabase"
+ws = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_09AB5B7F24494A77884651D4489996B9.geodatabase"
 arcpy.env.workspace = ws
 fcs = arcpy.ListFeatureClasses()
 
