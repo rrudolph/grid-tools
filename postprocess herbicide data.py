@@ -61,11 +61,14 @@ def get_unique_fc(fc, field):
 
 
 def get_unique_excel(xlsx):
+	'''Get unique values from the formulation codes in the input excel spreadsheet.'''
 	xls = pd.ExcelFile(xlsx)
 	sheet = xls.sheet_names[0]
 	return list(xls.parse(sheet)["formulation_Code"])
 
 def check_mismatch():
+	'''Compare the formulation codes from the agol featureclass with those in the spreadsheet. 
+	Raise error and exit script if different.'''
 	print("Checking for missing form codes")
 	fc_vals = get_unique_fc(fc, "formulation_Code")
 	excel_vals = get_unique_excel(xlsx)
@@ -80,12 +83,15 @@ def check_mismatch():
 
 
 def get_form_code_data(xlsx):
+	'''Return a pandas dataframe of the entire formulation code spreadsheet.'''
 	xls = pd.ExcelFile(xlsx)
 	sheet = xls.sheet_names[0]
 	df = xls.parse(sheet)
 	return df
 
 def data_lookup(df, row, column):
+	'''Look up a value from the formulation code data frame. 
+	Returns a value so it can be written to the featureclass'''
 	# ic(df)
 	# ic(row)
 	# ic(column)
@@ -102,6 +108,8 @@ def data_lookup(df, row, column):
 
 
 def calc_oz(wet_rate, finished_Gallons, finished_Ounces):
+	'''Converts gallons to ounces if gallons are used by the field user. Otherwise, just
+	return the ounces if the user entered only ounces.'''
 	ic(finished_Gallons)
 	if finished_Gallons:
 		return wet_rate*(finished_Gallons*128)
@@ -125,6 +133,8 @@ bad_form_codes = []
 check_mismatch()
 
 print("Processing herbicide data...")
+
+'''Go row by row to enter data from spreadsheet into the featureclass'''
 with arcpy.da.UpdateCursor(fc, field_list) as cursor:
 	for row in cursor:
 		oid = row[27]
@@ -159,8 +169,6 @@ with arcpy.da.UpdateCursor(fc, field_list) as cursor:
 		adjuvant_2_Trade = row[24]
 		adjuvant_2_EPA = row[25]
 		adjuvant_2_Rate = row[26]
-
-		# Test if form code returns none. Procede with data copy if not.
 
 		# Lookup and copy
 		try:
