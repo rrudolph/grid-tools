@@ -1,5 +1,9 @@
 '''
 Checks CHIS AGOL invasive grid features for common errors.
+
+Does not write to any featureclass or other data. Only displays attribute issues that are commonly found 
+because of incorrect field user entry.
+
 Updated 6/2/2021
 R. Rudolph
 '''
@@ -48,6 +52,9 @@ all_fcs = [weed_point,
 			]
 
 def convert_utc_to_local(utc_time):
+	'''Display UTC time as local time. Anything that comes out of AGOL in the time field
+	is UTC and it's a constant chore to display time as local time to make sense for 
+	reporting and data QA/QC'''
 	from_zone = tz.tzutc()
 	to_zone = tz.tzlocal()
 	utc = utc_time.replace(tzinfo=from_zone)
@@ -57,7 +64,7 @@ def convert_utc_to_local(utc_time):
 
 
 def get_unique_values(fc, field):
-    # Returns unique values of a field into a sorted list
+    '''Accepts a featureclass and a field name. Returns only the unique values in that field.'''
     with arcpy.da.SearchCursor(fc, [field]) as cursor:
         return {row[0] for row in cursor}
 
