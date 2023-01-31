@@ -9,7 +9,7 @@ Run using ArcGIS Pro Python 3. Running this script **requires** having a geodata
 ## Initial Data Download
 
 ![ArcGIS Pro Download](https://github.com/rrudolph/grid-tools/blob/master/img/arcpro_download.jpg "Download")
-In ArcGIS Pro, zoom to area of interest for processing the grid data with your AGOL feature service the only thing in the map window. In the Map Ribbon, click Download.  this will put it in your current workspace directory as a ".geodatabase" sqlite file.  Point the `process invasive treatment grid.py` script to this geodatabase to convert to a ".gdb" file and process the gid data. 
+In ArcGIS Pro, zoom to area of interest for processing the grid data with your AGOL feature service the only thing in the map window. In the Map Ribbon, click Download.  this will put it in your current workspace directory as a ".geodatabase" sqlite file. Note the location of this file.  Point the `process invasive treatment grid.py` script to this geodatabase to convert to a ".gdb" file and process the grid data. 
 
 
 ## Process Herbicide Attribute Data

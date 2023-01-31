@@ -15,11 +15,11 @@ from icecream import ic
 import sys
 
 # Don't edit the live service!  Use a .geodatabase sync copy to do big edits like this.
-fc = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_934F9A1B41764DBEA3936EA38C261124.geodatabase\main.Weed_Point"
-# fc = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_934F9A1B41764DBEA3936EA38C261124.geodatabase\main.Weed_Line"
+# fc = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_9AD4A36EFFB84A07925FE963735AF2CB.geodatabase\main.Weed_Point"
+fc = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_9AD4A36EFFB84A07925FE963735AF2CB.geodatabase\main.Weed_Line"
 
 
-# Now on OneDrive
+# This is the herbicide formulation code lookup table. Now on OneDrive
 xlsx = r"C:\Users\RRudolph\OneDrive - DOI\CHIS Invasives\CHIS_Formulation_Codes.xlsx"
 
 field_list = [
@@ -51,7 +51,7 @@ field_list = [
 	"adjuvant_2_EPA",
 	"adjuvant_2_Rate",
 	"OBJECTID"
-	]
+		]
 
 ## Functions
 def get_unique_fc(fc, field):

@@ -480,6 +480,18 @@ def get_config(config_item):
         data = yaml.safe_load(f)
         return data.get(config_item)
 
+def get_line_buffer_type(buffer_type):
+    '''Weed line features can be buffered on either side or left or right side. This function converts
+    the data from the field into the text that the buffer function needs to convert it to left/right/or both sides.
+    If the buffer type is None or some other unknown value, then just make it a "FULL" buffer'''
+    switcher = {
+       'Both Sides'    : 'FULL',
+       'Right Side'    : 'RIGHT',
+       'Left Side'     : 'LEFT'}
+
+    return switcher.get(buffer_type, "FULL") 
+
+
 def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end = None, convert_gdb = True):
     '''
     Run the main program.
@@ -578,12 +590,14 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
                     print_(f"Weed lines to buffer: {weed_line_to_buffer_count} and not buffer: {weed_line_not_buffer_count}")
 
                     if weed_line_to_buffer_count > 0:
-                        with arcpy.da.SearchCursor(weed_line_to_buffer, ["OBJECTID", "Action_Date", "applicator", "weed_Target"] ) as cursor:
+                        with arcpy.da.SearchCursor(weed_line_to_buffer, ["OBJECTID", "Action_Date", "applicator", "weed_Target", "road_Sides", "meter_Buffer_Distance"] ) as cursor:
                             for row in cursor:
                                 oid = row[0]  
                                 Action_Date = row[1]
                                 applicator = row[2]
                                 weed_Target = row[3]
+                                buffer_side_type = row[4]
+                                buffer_distance = row[5]
 
                                 out_select = f"{weed_line_to_buffer}_{oid}"
                                 out_select_buffer = f"{weed_line_to_buffer}_{oid}_buffer"
@@ -602,9 +616,16 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
                                 print_("Copying {}".format(fc_name))
                                 arcpy.CopyFeatures_management(grid_mem, out_select_grid_by_loc)
 
+                                print_(f"Buffering based on buffer distance of {buffer_distance}")
                                 arcpy.analysis.Buffer(out_select,
                                     out_select_buffer,
-                                    "meter_Buffer_Distance", "FULL", "FLAT", "NONE", None, "PLANAR")
+                                    buffer_distance,
+                                    get_line_buffer_type(buffer_side_type),
+                                    "FLAT",
+                                    "NONE",
+                                    None,
+                                    "PLANAR")
+
                                 add_field(out_select_buffer, "Action_Type", 50, "Action Type")
                                 print_("Calculating field")
                                 arcpy.CalculateField_management(out_select_buffer, "Action_Type", f"'Weed_Line'", "PYTHON_9.3", "")
@@ -768,9 +789,9 @@ if __name__ == '__main__':
     master_cross_list = []
     main_script = True
     convert_gdb = True
-    data_ws = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_74C570A176A8418C9D1F85852E6EA9BE.geodatabase"
+    data_ws = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_9AD4A36EFFB84A07925FE963735AF2CB.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasives\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
-    scratch_ws = r"C:\GIS\Projects\CHIS Invasives\scratch_pups_2022.gdb"
+    scratch_ws = r"C:\GIS\Projects\CHIS Invasives\scratch_new_script_test.gdb"
 
     if not arcpy.Exists(scratch_ws):
         print_(f"Making scratch GeoDB: {scratch_ws}")

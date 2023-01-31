@@ -16,7 +16,7 @@ from tabulate import tabulate
 from dateutil import tz
 
 # Use the local synced copy downloaded from AGOL, not the actual feature service. 
-path = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_934F9A1B41764DBEA3936EA38C261124.geodatabase"
+path = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_9AD4A36EFFB84A07925FE963735AF2CB.geodatabase"
 
 
 weed_point 				= join(path, "main.Weed_Point")
@@ -124,8 +124,15 @@ def is_non_herbicide_mode(treatment_mode):
 
 def weed_error_check(fc, msg):
 	print(f"{'*'*10} Processing {msg}")
-	error_list = [] # The error list is a list of four items in a tuple appended using the below search cursor and if statements. 
+	error_list = [] # The error list is a list of four items in a tuple appended using the below search cursor and if statements.
 	fields = ["OBJECTID", "finished_Gallons", "finished_Ounces", "formulation_Code", "weed_Target", "treatment_Mode", "percent_Target", "Action_Date", "applicator"]
+	is_line = False
+
+	desc = arcpy.Describe(fc)
+	if desc.shapeType == "Polyline":
+		is_line = True
+		fields += ["road_Sides", "meter_Buffer_Distance"]
+
 	with arcpy.da.SearchCursor(fc, fields) as cursor:
 		for row in cursor:
 			oid = row[0]
@@ -137,6 +144,11 @@ def weed_error_check(fc, msg):
 			percent_Target = row[6]
 			action_date = row[7]
 			applicator = row[8]
+
+			if is_line:
+				buffer_type = row[9]
+				buffer_distance = row[10]
+
 
 			error = f"Gallons: ({finished_Gallons}) Ounces: ({finished_Ounces})"
 			if finished_Gallons and finished_Ounces:
@@ -153,6 +165,11 @@ def weed_error_check(fc, msg):
 				error_list.append((oid, action_date, applicator, "Percent cover missing."))
 			if not action_date:
 				error_list.append((oid, action_date, applicator, "UTC date missing."))
+
+			if is_line:
+				if not buffer_type and buffer_distance or buffer_type and not buffer_distance:
+					error_list.append((oid, action_date, applicator, f"Weed line buffer mismatch: type={buffer_type} distance={buffer_distance}"))
+
 
 	if error_list:
 		print(f"Errors detected with weed data")

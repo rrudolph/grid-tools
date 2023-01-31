@@ -4,26 +4,34 @@ print("Importing modules")
 import arcpy, os
 arcpy.env.overwriteOutput = True
 
-rootDir = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427"
-scratch_ws = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\scratch.gdb"
+rootDir = r"C:\GIS\Projects\CHIS Invasives\Domain Update Jan2023"
 
-inWorkspace = os.path.join(rootDir, "NChannelIslandsTreatmentTemplate.gdb")
+inWorkspace = os.path.join(rootDir, "Features_FD64BA1E1B2E479B8F1E98DB0C7B3828_MobileGdbToFileGdb.gdb")
 
 # domain_list = ["DOM_DataRecorder", "DOM_InvasiveSpecies"]
-domain_list = [domain.name for domain in arcpy.da.ListDomains(inWorkspace)]
+domain_list = [domain for domain in arcpy.da.ListDomains(inWorkspace)]
 
-for domainName in domain_list:
-	print(domainName)
-	# outTable = os.path.join(scratch_ws, domainName + "_DomainToTable")
+for domain in domain_list:
+    domainName = domain.name
+    print(f"********* {domainName} *********")
+    if domain.domainType == 'CodedValue':
+        coded_values = domain.codedValues
+        for val, desc in coded_values.items():
+            print('{0}'.format(val))
 
-	# print("Running table to domain...")
-	# arcpy.DomainToTable_management(in_workspace=inWorkspace,
-	# 	domain_name=domainName,
-	# 	out_table=outTable,
-	# 	code_field="Code",
-	# 	description_field="Description",
-	# 	configuration_keyword="")
+    print()
+    print()
 
-	# arcpy.TableToTable_conversion(outTable, os.path.join(rootDir, "Domain files"), domainName + ".csv")
+    # outTable = os.path.join(rootDir, domainName + "_DomainToTable.csv")
 
-print("Done.")
+    # print("Running table to domain...")
+    # arcpy.DomainToTable_management(in_workspace=inWorkspace,
+    #   domain_name=domainName,
+    #   out_table=outTable,
+    #   code_field="Code",
+    #   description_field="Description",
+    #   configuration_keyword="")
+
+    # arcpy.TableToTable_conversion(outTable, os.path.join(rootDir, "Domain files"), domainName + ".csv")
+
+# print("Done.")
