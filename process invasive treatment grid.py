@@ -797,7 +797,7 @@ if __name__ == '__main__':
     convert_gdb = True
     data_ws = r"C:\GIS\Projects\CHIS Invasives\Feature Downloads\Features_9AD4A36EFFB84A07925FE963735AF2CB.geodatabase"
     in_grid = r"C:\GIS\Projects\CHIS Invasives\Original DB\NChannelIslandsTreatmentTemplate.gdb\NCI_Grids\NCI_Grid_25m"
-    scratch_ws = r"C:\GIS\Projects\CHIS Invasives\scratch_new_script_test.gdb"
+    scratch_ws = r"C:\GIS\Projects\CHIS Invasives\scratch_new_script_test2.gdb"
 
     if not arcpy.Exists(scratch_ws):
         print_(f"Making scratch GeoDB: {scratch_ws}")
