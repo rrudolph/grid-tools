@@ -568,7 +568,9 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
                     where_clause=exp)
 
                 if fc_name == "Weed_Line":
-                    # We need to handle weed lines that have buffer values differently
+                    '''We handle weed line's differently because of their potential to be buffered.
+                    Buffered lines can cross many grid cells and we need to calculate the herbicide placement in
+                    an approximate manner commensurate to the area they take up over a grid cell.'''
                     weed_line_to_buffer = temp_feature + "_to_buffer"
                     weed_line_not_buffer = temp_feature + "_not_buffer"
 
@@ -590,6 +592,7 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
                     print_(f"Weed lines to buffer: {weed_line_to_buffer_count} and not buffer: {weed_line_not_buffer_count}")
 
                     if weed_line_to_buffer_count > 0:
+                        # Commence buffering process
                         with arcpy.da.SearchCursor(weed_line_to_buffer, ["OBJECTID", "Action_Date", "applicator", "weed_Target", "road_Sides", "meter_Buffer_Distance"] ) as cursor:
                             for row in cursor:
                                 oid = row[0]  
@@ -648,7 +651,7 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
 
                                 print_("Adding original_finished_ounces/gallons fields")
                                 arcpy.management.AddField(out_select_union, "original_finished_ounces", "DOUBLE", None, None, None, "Original Finished Ounces Applied", "NULLABLE", "NON_REQUIRED", '')
-                                arcpy.management.AddField(out_select_union, "original_finished_gallons", "DOUBLE", None, None, None, "Original Finished Ounces Applied", "NULLABLE", "NON_REQUIRED", '')
+                                arcpy.management.AddField(out_select_union, "original_finished_gallons", "DOUBLE", None, None, None, "Original Finished Gallons Applied", "NULLABLE", "NON_REQUIRED", '')
 
                                 #                                                  0                     1                       2                    3                          4               5
                                 with arcpy.da.UpdateCursor(out_select_union, ['finished_Ounces', 'finished_Gallons', 'original_finished_ounces', 'original_finished_gallons', 'Action_Type', 'gross_Acres']) as cursor:
