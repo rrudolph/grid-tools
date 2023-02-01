@@ -674,6 +674,8 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
                         non_buffered_line_exists = True
 
 
+                # I had a hard time with the logic of what to do for all features that were not weed lines and weed lines that did not need buffering. 
+                # There is lots of extra debugging code in here to help me figure it out.
                 if fc_name != "Weed_Line" or non_buffered_line_exists:
 
                     if non_buffered_line_exists:
@@ -730,6 +732,7 @@ def main(data_ws, scratch_ws, in_grid, select_date_start = None, select_date_end
                 print_(msg, "yellow")
                 calc_error_field(final_fc, msg, e2[0])
 
+    # Tons of extra unneeded fields get generated during the buffering phase. Delete them.
     print_("Deleting unneeded fields", "red")
     del_fields = other_field_list + ["Join_Count", "TARGET_FID"] + [f.name for f in arcpy.ListFields(final_fc) if f.name.startswith("FID")] 
     delete_fields(final_fc, del_fields)

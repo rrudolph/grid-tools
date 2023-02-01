@@ -128,6 +128,7 @@ def weed_error_check(fc, msg):
 	fields = ["OBJECTID", "finished_Gallons", "finished_Ounces", "formulation_Code", "weed_Target", "treatment_Mode", "percent_Target", "Action_Date", "applicator"]
 	is_line = False
 
+	# Add some fields to check if we are inspecting the weed line.
 	desc = arcpy.Describe(fc)
 	if desc.shapeType == "Polyline":
 		is_line = True
@@ -177,8 +178,8 @@ def weed_error_check(fc, msg):
 		error_dict["OIDs"] 			= map(lambda d: d[0], error_list)
 		error_dict["Date (UTC)"] 	= map(lambda d: d[1], error_list)
 		error_dict["Date (Local)"] 	= map(lambda d: convert_utc_to_local(d[1]), error_list)
-		error_dict["Applicator"] = map(lambda d: d[2], error_list)
-		error_dict["Message"] = map(lambda d: d[3], error_list)
+		error_dict["Applicator"] 	= map(lambda d: d[2], error_list)
+		error_dict["Message"] 		= map(lambda d: d[3], error_list)
 		print(tabulate(error_dict, headers="keys")) 
 		print(f"OIDs: {set([oid for oid, date_, applicator, msg in error_list])}")
 	else:
@@ -196,7 +197,7 @@ def no_t_check(fc, msg):
 			spp = row[3]
 			# ic(action_date, staff, spp)
 
-			if action_date is None or action_date == " ":
+			if action_date is None or action_date.isspace():
 				error_list.append((oid, "missing action date."))
 			if staff is None or staff.isspace():
 				error_list.append((oid, "missing staff."))
@@ -220,11 +221,11 @@ def cut_line_error_check(fc, msg):
 			action_date = row[1]
 			staff = row[2]
 			spp = row[3]
-			if action_date is None:
+			if action_date is None or action_date.isspace():
 				error_list.append((oid, "missing action date."))
-			if staff is None:
+			if staff is None or staff.isspace():
 				error_list.append((oid, "missing staff."))
-			if spp is None:
+			if spp is None or spp.isspace():
 				error_list.append((oid, "missing species."))
 	if error_list:
 		print("Errors detected with cut line")
