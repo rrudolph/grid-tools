@@ -28,3 +28,7 @@ Edit variables at the bottom of the script before running.
 
 
 The `config.yaml` yaml file typically does not need editing.  It's where I stored some field names, projection strings, and other data that I didn't want to clutter up the script with. 
+
+
+## Optional Toolbox
+`AGOL_Backup.atbx` is toolbox tool only usable in ArcGIS Pro to backup AGOL services by the service ID. Optional and included here to expedite backing up AGOL services before undergoing major edits. 
