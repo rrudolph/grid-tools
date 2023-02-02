@@ -197,7 +197,7 @@ def no_t_check(fc, msg):
 			spp = row[3]
 			# ic(action_date, staff, spp)
 
-			if action_date is None or action_date.isspace():
+			if action_date is None:
 				error_list.append((oid, "missing action date."))
 			if staff is None or staff.isspace():
 				error_list.append((oid, "missing staff."))
@@ -221,7 +221,7 @@ def cut_line_error_check(fc, msg):
 			action_date = row[1]
 			staff = row[2]
 			spp = row[3]
-			if action_date is None or action_date.isspace():
+			if action_date is None:
 				error_list.append((oid, "missing action date."))
 			if staff is None or staff.isspace():
 				error_list.append((oid, "missing staff."))

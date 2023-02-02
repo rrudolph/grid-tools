@@ -53,7 +53,7 @@ def elapsed_time(start,end):
     print(f"Elapsed time: {format_timespan(end - start)}")
 
 def print_(text, color="black"):
-    # Make fancy colored output if using the terminal. 
+    '''Make fancy colored output if using the terminal. '''
     logger.info(text)
 
     if color == "red":
@@ -89,6 +89,7 @@ def print_(text, color="black"):
         print(text)
             
 def add_fc_name(fc):
+    '''Add a field and calculate it with the name of the featureclass to keep a record from whence it came.'''
     base_name = get_base_name(fc)
     print_("Adding FILESOURCE field and calculating")
     arcpy.AddField_management(fc, "FILESOURCE", "text", "", "", "50")
@@ -125,12 +126,12 @@ def get_unique_values(fc, field):
         return {row[0] for row in cursor if row[0] is not None}
 
 def make_mem_name(fc):
-    # Make an in-memory temporary featureclass
+    '''Make an in-memory temporary featureclass'''
     name = arcpy.Describe(fc).name
     return r"in_memory\{}".format(name)
 
-def check_field(fc, field):
-    # Check if field exists
+def field_exists(fc, field):
+    '''Check if field exists'''
     fieldNames = [f.name for f in arcpy.ListFields(fc)]
     if field in fieldNames:
         return True
@@ -138,9 +139,8 @@ def check_field(fc, field):
         return False
 
 def add_field(fc, field, fieldLength, alias = None):
-    # Adds a field if it doesn't exists
-    fieldNames = [f.name for f in arcpy.ListFields(fc)]
-    if field in fieldNames:
+    '''Adds a field if it doesn't exists'''
+    if field_exists(fc, field):
         # sys.exit("Field exists! ({})".format(field) +  
         #   " Might want to check on that before you overwrite it.")
         print_("Field exists.")
@@ -150,9 +150,7 @@ def add_field(fc, field, fieldLength, alias = None):
         print_("Successfully added field: " + field)
 
 def delete_fields(fc, fieldList):
-    '''
-    Delete fields. Accepts a featureclass and a list of field names. 
-    '''
+    '''Delete fields. Accepts a featureclass and a list of field names.'''
     for field in fieldList:
         try:
             print_("Deleting field " + field, "yellow")
@@ -162,11 +160,11 @@ def delete_fields(fc, fieldList):
 
 
 def strip_non_alphanum(string):
+    '''Remove any non alphanumeric characters in a string like spaces, slashes, etc'''
     return re.sub('[^0-9a-zA-Z]+', '_', string)
 
 def calc_error_field(fc, msg, val):
-    # Calculates the sub id based on the input val (or key, 
-    # or ID, whatever you want to call it)
+    '''Adds a field and populates it with an error during overlap error checking'''
     error_field_name = "Overlap_Issue"
     add_field(fc, error_field_name, 25)
     with arcpy.da.UpdateCursor(fc, ["OID@", error_field_name]) as cursor:
@@ -194,7 +192,7 @@ def process_nia(fc):
             return nia
 
     field_list = ["percent_Target", "gross_Acres", "net_Acres", 'OBJECTID', 'Action_Type']
-    acceptable_features = ["Weed_Line", "Weed_Point"]
+    acceptable_features = ["Weed_Line", "Weed_Point"] # Only write the NIA for weed lines or points
     error_list = []
 
     print("Updating net infested acres...")
@@ -217,7 +215,7 @@ def process_nia(fc):
     print(f"OIDs with percent cover error: {error_list}")
 
 def get_geom(fc, inputID):
-    # Returns a list of geometry from input fc.
+    '''Returns a list of geometry from input fc.'''
     fieldNames = [f.name for f in arcpy.ListFields(fc)]
     if inputID in fieldNames:
         pass
@@ -260,8 +258,7 @@ def get_action_type(fc):
     
 def generate_output_grid(out_fc, geom, join_fc, sr, species):
     ''' Creates a new featureclass based on cut or uncut geometry from the cut function.
-    Does a spatial join from the source point or line feature. Adds needed fields.
-    '''
+    Does a spatial join from the source point or line feature. Adds needed fields.'''
     print_("Generating grid for " + out_fc, "yellow")
     print_("Creating output feature class")
     arcpy.CreateFeatureclass_management(dirname(out_fc),
@@ -311,7 +308,7 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
 
     # Add weed target field if it doesn't exist. This is for the non-weed treatment features.
     weed_target = "weed_Target"
-    if not check_field(out_join, weed_target):
+    if not field_exists(out_join, weed_target):
         print("Adding weed {} field".format(weed_target))
         add_field(out_join, weed_target, 100)
         print_("Calculating field")
@@ -319,10 +316,8 @@ def generate_output_grid(out_fc, geom, join_fc, sr, species):
 
 
 def cut(lines, polygons):
-    '''
-    Cut a cell by a line. Put into two lists of geometry, cells that got cut,
-    and cells that did not get cut.  Return both lists.
-    '''
+    '''Cut a cell by a line. Put into two lists of geometry, cells that got cut,
+    and cells that did not get cut.  Return both lists.'''
     print_("Cutting", "cyan")
     slices = []
     no_cross = []
@@ -353,6 +348,9 @@ def cut(lines, polygons):
 
 
 def check_scratch_db():
+    '''Checks if the scratch geodatabase is empty. Exit if not.  Since there is so 
+    much temporary geoprocessing data that gets generated, I wanted to have a clean
+    scratch db so everything was cleanly stored for each time this script runs'''
     fcs = arcpy.ListFeatureClasses()
     if len(fcs) > 0:
         sys.exit('''
@@ -364,8 +362,7 @@ Please delete files from it and try again.
         print_("Scratch workspace empty, continuing...", "green")
 
 def check_spatial_ref(fc):
-    """Checks for a specified spatial reference.  Exits if not met. 
-    """
+    '''Checks for a specified spatial reference.  Exits if not met.'''
     sr_name = arcpy.Describe(fc).spatialReference.name
     alias = arcpy.Describe(fc).spatialReference.alias
     pcs_code = arcpy.Describe(fc).spatialReference.PCSCode
@@ -389,7 +386,7 @@ used in this project.
         print_(f"Featureclass {fc} is good: {sr_name}", "green")
 
 def get_fc_list(inWS:"Input workspace") -> "Full list of featureclasses":
-    """Temporarily sets the workspace and returns the full path and name of each fc."""
+    '''Temporarily sets the workspace and returns the full path and name of each fc.'''
     return_ = []
     with arcpy.EnvManager(workspace=inWS):
         fcs = arcpy.ListFeatureClasses()
@@ -401,10 +398,8 @@ def get_fc_list(inWS:"Input workspace") -> "Full list of featureclasses":
     return return_
 
 def make_projected_gdb(gdb):
-    """ 
-    Makes a geodatabase with the same name but with _projected at the end. 
-    Input a path to a geodatabase. 
-    """
+    '''Makes a geodatabase with the same name but with _projected at the end. 
+    Input a path to a geodatabase.'''
     gdb_name = arcpy.Describe(gdb).name
     projected_name = gdb_name.split(".")[0] + "_projected." + gdb_name.split(".")[1]
     dir_name = dirname(gdb)
@@ -414,9 +409,7 @@ def make_projected_gdb(gdb):
     return return_name
 
 def project_all_fcs(gdb):
-    """ 
-    Projects all fcs in the input geodatbase into State Plane. 
-    """
+    ''' Projects all fcs in the input geodatbase into State Plane. '''
     print("Projecting all fcs")
     fcs = get_fc_list(gdb)
     proj_gdb = make_projected_gdb(gdb)

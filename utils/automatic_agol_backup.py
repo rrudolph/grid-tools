@@ -45,7 +45,7 @@ def strip_non_alphanum(string):
 
 
 # Vars
-backup_folder = r"C:\GIS\Projects\CHIS Invasive GeoDB testing\WildLands_Grid_System_20200427\Archive"
+backup_folder = r"C:\GIS\Projects\CHIS Invasives\Archive"
 now = time.strftime('%Y%m%d%H%M%S')
 db_name = f"AGOL_Grid_DB_Backup_{now}"
 out_db = os.path.join(backup_folder, f"{db_name}.gdb")
@@ -61,7 +61,7 @@ logger = logging.getLogger()
 plog(f"Connecting to AGOL")
 gis = GIS("pro")
 ## Vars for tool
-item_id = '29c3f9e4367a49a0bf770b3e0cc65082'
+item_id = '3f3e5cdced0340b494bcdce647809ca0'
 export_type = "File Geodatabase"
 
 data_item = gis.content.get(item_id)
