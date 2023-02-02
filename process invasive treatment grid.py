@@ -447,6 +447,8 @@ def project_all_fcs(gdb):
 
 
 def copy_mobile_to_gdb(in_ws, out_ws):
+    '''Wrote this because I was having trouble with the built in tool in Pro.
+    Purpose is to copy all the features from the downloaded mobile gdb to a file gdb.'''
     with arcpy.EnvManager(workspace=in_ws):
         fcs = arcpy.ListFeatureClasses()
         for fc in fcs:
@@ -457,6 +459,8 @@ def copy_mobile_to_gdb(in_ws, out_ws):
             arcpy.management.CopyFeatures(fc, out_fc, '', None, None, None)
 
 def convert_to_gdb(ws):
+    '''Was having troulbe with the built in Pro mobile gdb to file gdb tool, so wrote my own.
+    Could maybe remove all this if the standard tool is working agian.'''
     ws_gdb = ws.replace(".geodatabase", ".gdb")
     ws_gdb_name = ws_gdb.split("\\")[-1]
     dir_name = dirname(ws)
@@ -468,6 +472,8 @@ def convert_to_gdb(ws):
     return converted_gdb
 
 def get_config(config_item):
+    '''Pull configuration strings out of the config file. This helps keep the main script 
+    free of long projection strings and other misc config settings and slightly more organized.'''
     here = Path(__file__).parent
     with open(here.joinpath("config.yaml")) as f:
         data = yaml.safe_load(f)
